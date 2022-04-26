@@ -1,0 +1,23 @@
+{
+    "compilerOptions": {
+        "lib": ["ES2021"],
+        "module": "commonjs",
+        "target": "ES2021",
+        "esModuleInterop": true,
+        "resolveJsonModule": true,
+        "allowSyntheticDefaultImports": true,
+        "noImplicitAny": true,
+        "moduleResolution": "node",
+        "sourceMap": true,
+        "outDir": "dist",
+        "baseUrl": ".",
+        "skipLibCheck": true,
+        "allowJs": true,
+        "paths": {
+            "@/*": ["./src/*"],
+            "*": ["./src/types/definitions/*"]
+        }
+    },
+    "include": ["./src/**/*.ts", "./src/migrations/*", "./scripts/**/*.ts"],
+    "ts-node": { "files": true }
+}
