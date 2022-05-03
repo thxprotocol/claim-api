@@ -4,7 +4,8 @@ import db from './util/database';
 import { createTerminus } from '@godaddy/terminus';
 import { healthCheck } from './util/healthcheck';
 import { logger } from './util/logger';
-import { agenda } from './util/agenda';
+// import { agenda } from './util/agenda';
+import { calculation } from './util/calculation';
 
 const server = http.createServer(app);
 
@@ -15,7 +16,7 @@ const options = {
     },
     onSignal: (): Promise<any> => {
         logger.info('Server shutting down gracefully');
-        return Promise.all([db.disconnect(), agenda.stop()]);
+        return Promise.all([db.disconnect(), calculation.stop()]);
     },
     logger: logger.error,
 };
