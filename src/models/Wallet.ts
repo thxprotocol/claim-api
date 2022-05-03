@@ -10,11 +10,11 @@ export type IWallet = mongoose.Document & {
 const walletSchema = new mongoose.Schema(
     {
         _id: String,
-        staking: String,
+        staking: Boolean,
         signedUpAt: Date,
         lastActiveAt: Date,
     },
     { timestamps: true },
 );
 
-export const Wallet = mongoose.model<IWallet>('Wallet', walletSchema, 'pilot-wallet');
+export const Wallet = mongoose.model<IWallet>('Wallet', walletSchema);
