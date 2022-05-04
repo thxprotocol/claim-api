@@ -23,7 +23,6 @@ const walletSchema = new mongoose.Schema(
             default: Date.now()
         }
     },
-    { timestamps: true },
 );
 
 export const Wallet = mongoose.model<IWallet>('Wallet', walletSchema, 'wallets');

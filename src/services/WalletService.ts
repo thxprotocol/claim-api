@@ -1,4 +1,4 @@
-import { IWallet, Wallet } from '@/models/Wallet';
+import { Wallet } from '@/models/Wallet';
 
 export default class WalletService {
 
@@ -6,6 +6,9 @@ export default class WalletService {
         return Wallet.findOne({ address });
     }
 
-
-
+    static async addWallet(address: string){
+        return await Wallet.create({
+            _id: address
+        });
+    }
 }
