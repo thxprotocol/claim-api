@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.use('/ping', (_req, res) => res.send('pong'));
 router.use('/health', healthRouter);
-router.use('/claims', claimRouter)
+router.use('/claims', claimRouter);
 router.use('/docs', docsRouter);
 
 export default router;

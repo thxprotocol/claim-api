@@ -5,6 +5,6 @@ import {InsertWallet} from "@/controllers/claims/post.controller";
 const router = express.Router();
 
 router.get('/:wallet', FindWallet);
-router.post('/wallet', InsertWallet)
+router.post('/wallet', InsertWallet);
 
 export default router;
