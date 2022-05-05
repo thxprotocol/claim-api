@@ -4,7 +4,7 @@ import TokenService from '@/services/TokenService';
 export const GetTokens = async (_req: Request, res: Response) => {
     let status = 500;
 
-    const response = await TokenService.findTokenByAddress(_req.body.wallet);
+    const response = await TokenService.getAllTokenAddresses();
 
     if (!response) {
         res.status(status).send('No token found!');

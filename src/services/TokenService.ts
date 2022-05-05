@@ -1,13 +1,17 @@
 import { Token } from '@/models/Token';
 export default class TokenService {
-    static findTokenByAddress(address: string) {
-        return Token.findOne({ address });
+    static async findTokenByAddress(address: string) {
+        return Token.findById(address);
     }
 
     static async addToken(address: string, type: string) {
         return await Token.create({
             _id: address,
-            tokenType: type,
+            type: type,
         });
+    }
+
+    static async getAllTokenAddresses() {
+        return Token.find({});
     }
 }
