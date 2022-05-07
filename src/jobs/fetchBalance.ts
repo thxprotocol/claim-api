@@ -14,12 +14,11 @@ export async function measureBalances() {
 
     // Retrieve the balances for all wallets available
     for (let i = 0; i < wallets.length; i++) {
-        let tokens: { [k: string]: number } = {}
+        let tokens: { [k: string]: number } = {};
 
         // Polygon Chain for Custom tokens like DOIS
         let balance: { [k: string]: any } = await fetchBalance(137, wallets[i]._id);
         tokens = procesResponse(balance, tokens);
-        console.log(balance);
 
         // If the wallet doesn't hold any of our token, ignore.
         if (Object.keys(tokens).length >= 1) {
