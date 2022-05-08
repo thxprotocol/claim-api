@@ -1,8 +1,6 @@
-import { Wallet, IWallet } from '@/models/Wallet';
-import { Measurement, IMeasurement } from '@/models/Measurement';
-import {getFeeCollectorContract, getProvider} from '@/util/network';
-import { getContractFromName } from '@/util/network';
-import {ContractName} from "@thxnetwork/artifacts";
+import {IWallet, Wallet} from '@/models/Wallet';
+import {IMeasurement} from '@/models/Measurement';
+import {getContractFromName, getFeeCollectorContract} from '@/util/network';
 import MeasurementService from "@/services/MeasurementService";
 import TokenService from "@/services/TokenService";
 import {IToken} from "@/models/Token";
@@ -87,25 +85,35 @@ export async function jobCalculateRewards() {
     console.log(calculatedRewards);
 
     for (let key of tokenMap.keys()) {
-        let clonedRewards: Map<string, Map<string, number>> = calculatedRewards;
-
-        console.log(clonedRewards);
+        let clonedRewards = new Map(calculatedRewards);
+        clonedRewards = deepCloneMap(calculatedRewards, clonedRewards);
 
         for (const [address, tokens] of clonedRewards) {
-            clonedRewards.set(address, filterMap(tokens, key));
+            clonedRewards.set(address, filterMap(tokens, key, tokenMap));
         }
+
+        console.log(clonedRewards);
     }
 
 
     //TODO: submit that share to the smart contract mapping (address => uint)
 }
 
-function filterMap(map: Map<any, any>, keyFilter: string) {
+function deepCloneMap(original: Map<string, any>, copy: Map<any, any>) {
+    original.forEach((map, address) => {
+        copy.set(address, new Map(map));
+    });
+    return copy;
+}
+
+function filterMap(map: Map<any, any>, keyFilter: string, tokenMap: Map<string, string>) {
     for (let key of map.keys()) {
         if (key != keyFilter) {
             map.delete(key);
         }
     }
+    map.set(tokenMap.get(keyFilter), map.get(keyFilter));
+    map.delete(keyFilter);
     return map;
 }
 
