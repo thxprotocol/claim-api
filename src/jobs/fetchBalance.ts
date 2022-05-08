@@ -5,6 +5,7 @@ import {fromWei} from "web3-utils";
 import MeasurementService from "@/services/MeasurementService";
 
 export async function measureBalances() {
+    const POLYGON_CHAIN_ID = 137;
     let timeOfMeasurement = new Date();
     // Set it all to the same min/sec/ms so it can be grouped easier
     timeOfMeasurement.setHours(timeOfMeasurement.getHours(), 0, 0, 0);
@@ -17,7 +18,7 @@ export async function measureBalances() {
         let tokens: { [k: string]: number } = {};
 
         // Polygon Chain for Custom tokens like DOIS
-        let balance: { [k: string]: any } = await fetchBalance(137, wallets[i]._id);
+        let balance: { [k: string]: any } = await fetchBalance(POLYGON_CHAIN_ID, wallets[i]._id);
         tokens = procesResponse(balance, tokens);
 
         // If the wallet doesn't hold any of our token, ignore.
