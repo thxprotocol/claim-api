@@ -89,10 +89,17 @@ export async function jobCalculateRewards() {
         clonedRewards = deepCloneMap(calculatedRewards, clonedRewards);
 
         for (const [address, tokens] of clonedRewards) {
-            clonedRewards.set(address, filterMap(tokens, key, tokenMap));
-        }
+            let filteredMap: Map<string, number> = filterMap(tokens, key, tokenMap);
+            clonedRewards.set(address, filteredMap);
 
-        console.log(clonedRewards);
+            filteredMap.forEach(async (am, addr) => {
+                let reward = { address: addr, amount: am }
+                let result = await feeCollectorContract.methods.setRewards(address, [reward]).send({
+                    from: '0xB952d9b5de7804691e7936E88915A669B15822ef'
+                });
+                console.log(result);
+            })
+        }
     }
 
 
