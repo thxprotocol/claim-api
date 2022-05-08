@@ -17,6 +17,7 @@ export const InsertToken = async (_req: Request, res: Response) => {
 
     // If isTokenPresent has a value it means that the address is already un the database, so we do not insert it again.
     if (isTokenPresent) {
+        status = 409;
         msg = 'This address is already in the database';
     } else {
         status = 200;

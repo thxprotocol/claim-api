@@ -12,6 +12,6 @@ export default class TokenService {
     }
 
     static async getAllTokens() {
-        return Token.find({});
+        return Token.find();
     }
 }
