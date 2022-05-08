@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Contract } from 'web3-eth-contract';
 import { NetworkProvider } from '../types/enums';
 import { THXError } from './errors';
+import { default as FeeCollector } from '../json/FeeCollector.json'
 import { AbiItem } from 'web3-utils';
 import { getContractConfig } from '@/config/contracts';
 import { ContractName, currentVersion } from '@thxnetwork/artifacts';
@@ -76,6 +77,12 @@ export const getContractFromName = (npid: NetworkProvider, contractName: Contrac
 
     return new web3.eth.Contract(abi, address || contractConfig.address);
 };
+
+export const getFeeCollectorContract = (npid: NetworkProvider, address: string): Contract => {
+    const { web3 } = getProvider(npid);
+    const abi: any = FeeCollector;
+    return new web3.eth.Contract(abi, address);
+}
 
 export const getContractFromAbi = (npid: NetworkProvider, abi: AbiItem[], address: string): Contract => {
     const { web3 } = getProvider(npid);

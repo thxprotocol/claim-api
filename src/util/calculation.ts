@@ -8,7 +8,7 @@ export const eventNameCalculateRewards = 'jobCalculateRewards';
 export const calculation = new Agenda({
     maxConcurrency: 1,
     lockLimit: 1,
-    processEvery: '1 second',
+    processEvery: '5 seconds',
 });
 
 calculation.define(eventNameCalculateRewards, jobCalculateRewards);
@@ -17,7 +17,7 @@ db.connection.once('open', async () => {
     calculation.mongo(db.connection.getClient().db(), 'calculation-jobs');
     await calculation.start();
 
-    await calculation.every('5 seconds', eventNameCalculateRewards);
+    await calculation.every('10 seconds', eventNameCalculateRewards);
 
     logger.info('Started agenda processing');
 });

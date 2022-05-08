@@ -2,16 +2,14 @@ import mongoose from 'mongoose';
 
 export type IMeasurement = mongoose.Document & {
     timestamp: Date;
-    THX_tokens: number[];
-    DOIS_tokens: number[]
+    tokens: Object;
     address: string;
 };
 
 const measurementSchema = new mongoose.Schema(
     {
         timestamp: Date,
-        THX_tokens: Number,
-        DOIS_tokens: Number,
+        tokens: Object,
         address: String,
     },
     { timestamps: true },
