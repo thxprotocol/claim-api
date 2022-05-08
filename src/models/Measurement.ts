@@ -12,7 +12,6 @@ const measurementSchema = new mongoose.Schema(
         tokens: Object,
         address: String,
     },
-    { timestamps: true },
 );
 
 export const Measurement = mongoose.model<IMeasurement>('Measurement', measurementSchema);
