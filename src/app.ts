@@ -9,13 +9,13 @@ import router from '@/controllers';
 import db from '@/util/database';
 import { requestLogger } from '@/util/logger';
 import { errorOutput, notFoundHandler, errorLogger, errorNormalizer, corsHandler } from '@/middlewares';
-import { PORT, VERSION, MONGODB_URI } from '@/config/secrets';
+import { PORT, VERSION, MONGODB_URI_CLUSTER} from '@/config/secrets';
 
 axiosBetterStacktrace(axios);
 
 const app = express();
 
-db.connect(MONGODB_URI);
+db.connect(MONGODB_URI_CLUSTER);
 
 app.set('trust proxy', true);
 app.set('port', PORT);
