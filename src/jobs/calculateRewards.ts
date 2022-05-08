@@ -25,8 +25,6 @@ export async function jobCalculateRewards() {
     }
     const dailyBalanceFeeCollector: number = balanceOfFeeCollector / WEEK_DAYS;
 
-    console.log(dailyBalanceFeeCollector);
-
     let datePreviousWeek = new Date();
     datePreviousWeek.setDate(datePreviousWeek.getDate() - WEEK_DAYS);
 
@@ -90,16 +88,18 @@ export async function jobCalculateRewards() {
 async function getTotalMedianDay(date: string) {
     let totalMedianPerDay = new Map<string, number>();
 
+    // sets date of the measurement (f.e. 2022-05-08) and the second date + 1 (f.e. 2022-05-09)
     const dateTimeFirst = new Date(date);
     let tempTimeSecond = new Date(dateTimeFirst);
     const dateTimeSecond = new Date(tempTimeSecond.setDate(tempTimeSecond.getDate() + 1));
 
+    // finds all the measurements between the dates above
     const measurements: IMeasurement[] = await MeasurementService.getMeasurementByDate(dateTimeFirst, dateTimeSecond);
 
     for (const measurement of measurements) {
         let tempValuesMap = new Map<string, number[]>();
 
-        // for every token add a as a new key to the map
+        // for every token add the value to a map
         Object.values(measurement.tokens).forEach(m => {
             Object.keys(m).forEach(token => {
                 if (tempValuesMap.get(token) == undefined) {
@@ -114,6 +114,7 @@ async function getTotalMedianDay(date: string) {
                 totalMedianPerDay.set(token, 0);
             }
 
+            // add the median of balances per token to the total
             let currentAmount = totalMedianPerDay.get(token);
             const m = await median(balances);
             totalMedianPerDay.set(token, currentAmount + m);
