@@ -14,12 +14,12 @@ export async function jobCalculateRewards() {
     const WEEK_DAYS: number = 7;
 
     const contract = getContractFromName(0, 'LimitedSupplyToken', '0xB952d9b5de7804691e7936E88915A669B15822ef');
-    // const feeCollectorContract = getFeeCollectorContract(0, '0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400');
+    const feeCollectorContract = getFeeCollectorContract(0, '0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400');
 
     let [balanceOfFeeCollector] = await Promise.all([contract.methods.balanceOf('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400').call()]);
     if (balanceOfFeeCollector <= 0) {
         await contract.methods.transfer('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400', 1).send({
-            from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5'
+            from: '0xB952d9b5de7804691e7936E88915A669B15822ef'
         });
         balanceOfFeeCollector = await contract.methods.balanceOf('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400').call();
     }
