@@ -4,6 +4,8 @@ import {getFeeCollectorContract, getProvider} from '@/util/network';
 import { getContractFromName } from '@/util/network';
 import {ContractName} from "@thxnetwork/artifacts";
 import MeasurementService from "@/services/MeasurementService";
+import TokenService from "@/services/TokenService";
+import {IToken} from "@/models/Token";
 
 /**
  *
@@ -76,9 +78,35 @@ export async function jobCalculateRewards() {
         }
     }
 
+    const tokens: IToken[] = await TokenService.getAllTokens();
+    const tokenMap = new Map<string, string>();
+    tokens.forEach(token => {
+        tokenMap.set(token.type, token._id);
+    });
+
     console.log(calculatedRewards);
 
+    for (let key of tokenMap.keys()) {
+        let clonedRewards: Map<string, Map<string, number>> = calculatedRewards;
+
+        console.log(clonedRewards);
+
+        for (const [address, tokens] of clonedRewards) {
+            clonedRewards.set(address, filterMap(tokens, key));
+        }
+    }
+
+
     //TODO: submit that share to the smart contract mapping (address => uint)
+}
+
+function filterMap(map: Map<any, any>, keyFilter: string) {
+    for (let key of map.keys()) {
+        if (key != keyFilter) {
+            map.delete(key);
+        }
+    }
+    return map;
 }
 
 /**
