@@ -41,6 +41,12 @@ export async function jobCalculateRewards() {
     const wallets: IWallet[] = await Wallet.find({signedUpAt: {$lt: datePreviousWeek}});
     let calculatedRewards = new Map<string, Map<string, number>>();
 
+    const tokens: IToken[] = await TokenService.getAllTokens();
+    const tokenMap = new Map<string, string>();
+    tokens.forEach(token => {
+        tokenMap.set(token.type, token._id);
+    });
+
     for (const wallet of wallets) {
         try {
             let totalRewardsPerToken = new Map<string, number>();
@@ -73,34 +79,24 @@ export async function jobCalculateRewards() {
         }
     }
 
-    const tokens: IToken[] = await TokenService.getAllTokens();
-    const tokenMap = new Map<string, string>();
-    tokens.forEach(token => {
-        tokenMap.set(token.type, token._id);
-    });
+    for (const [address, tokens] of calculatedRewards) {
+        let filteredMap = new Map<string, number>();
+        let rewards: Object[] = [];
+        let existingRewards = await feecollector.methods.getRewards(address).call();
+        console.log(existingRewards);
 
-    for (let key of tokenMap.keys()) {
-        let clonedRewards = new Map(calculatedRewards);
-        clonedRewards = deepCloneMap(calculatedRewards, clonedRewards);
-
-        for (const [address, tokens] of clonedRewards) {
-            let filteredMap: Map<string, number> = filterMap(tokens, key, tokenMap);
-            clonedRewards.set(address, filteredMap);
+        for (let key of tokenMap.keys()) {
+            filteredMap.set(tokenMap.get(key), tokens.get(key));
         }
 
-        for (const [address, tokens] of clonedRewards) {
-            for (const [tokenAddress, reward] of tokens) {
-                //TODO: submit that share to the smart contract mapping (address => uint)
-                // CALL PUBLISH REWARDS
-
-                console.log(address + ": | " + tokenAddress + "= " + reward);
-                await publishRewards(feecollector, address, tokenAddress, reward).then((res) => {
-                    console.log(res);
-                }).catch((err) => {
-                    console.log(err);
-                });
-            }
+        for (const [tokenAddress, reward] of filteredMap) {
+            rewards.push({
+                token: tokenAddress,
+                amount: toWei(reward.toString())
+            });
         }
+
+        await publishRewards(feecollector, address, rewards);
     }
 }
 
@@ -108,17 +104,11 @@ export async function jobCalculateRewards() {
  * Method to publish the rewards to the smart contract based on the token and address of the account address.
  * @param contract The fee collector contract.
  * @param address The address of the account that the rewards will be awarded to.
- * @param tokenaddress The address of the token from the database by type (f.e THX = 0x033b8a8b8a88baq4243)
- * @param amount The amount of tokens per token.
+ * @param rewards
  */
-async function publishRewards(contract: Contract, address: string, tokenaddress: string, amount: number) {
-    let reward = {
-        token: tokenaddress,
-        amount: toWei(amount.toString())
-    }
-
+async function publishRewards(contract: Contract, address: string, rewards: Object[]) {
     // call the smart contract to set the rewards (from might change)
-    return await contract.methods.setRewards(address, [reward]).send({
+    return await contract.methods.setRewards(address, rewards).send({
         from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5'
     });
 }
@@ -174,35 +164,6 @@ function getValuesFromObject(tokens: Object) {
     });
 
     return tempValuesMap;
-}
-
-/**
- * Helper method to make a deep clone of a map to use for calculating rewards.
- * @param original The original map(s) of rewards estimated.
- * @param copy The deep cloned copied map.
- */
-function deepCloneMap(original: Map<string, any>, copy: Map<any, any>) {
-    original.forEach((map, address) => {
-        copy.set(address, new Map(map));
-    });
-    return copy;
-}
-
-/**
- * Helper method to filter the map and delete the token name (f.e DOIS) and replace it with the address.
- * @param map The map that needs to be filtered.
- * @param keyFilter The name of the token name that needs to be replaced/removed.
- * @param tokenMap The token map of the map with all the tokens.
- */
-function filterMap(map: Map<any, any>, keyFilter: string, tokenMap: Map<string, string>) {
-    for (let key of map.keys()) {
-        if (key != keyFilter) {
-            map.delete(key);
-        }
-    }
-    map.set(tokenMap.get(keyFilter), map.get(keyFilter));
-    map.delete(keyFilter);
-    return map;
 }
 
 /**
