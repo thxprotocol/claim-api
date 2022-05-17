@@ -5,7 +5,7 @@ import MeasurementService from "@/services/MeasurementService";
 import TokenService from "@/services/TokenService";
 import {IToken} from "@/models/Token";
 import {Contract} from "web3-eth-contract";
-import {toWei} from 'web3-utils';
+import {fromWei, toWei} from 'web3-utils';
 import {NetworkProvider} from "@/types/enums";
 
 /**
@@ -82,13 +82,21 @@ export async function jobCalculateRewards() {
     for (const [address, tokens] of calculatedRewards) {
         let filteredMap = new Map<string, number>();
         let rewards: Object[] = [];
-        let existingRewards = await feecollector.methods.getRewards(address).call();
-        console.log(existingRewards);
+        let existingRewards: Object[] = await feecollector.methods.getRewards(address).call();
 
+        // sets the token id to the address (f.e DOIS = 0x03fda03f0da03f9f9df)
         for (let key of tokenMap.keys()) {
             filteredMap.set(tokenMap.get(key), tokens.get(key));
         }
 
+        // merges the existing rewards with the current reward
+        existingRewards.forEach(entry => {
+            let tAddress: string = Object.values(entry)[0];
+            let tReward: number = Number(fromWei(Object.values(entry)[1]));
+            filteredMap.set(tAddress.toLowerCase(), filteredMap.get(tAddress.toLowerCase()) + tReward)
+        });
+
+        // loop through the new filtered map and push the rewards to a new object list
         for (const [tokenAddress, reward] of filteredMap) {
             rewards.push({
                 token: tokenAddress,
@@ -96,6 +104,7 @@ export async function jobCalculateRewards() {
             });
         }
 
+        // call the publish rewards method to push the rewards to the smart contract
         await publishRewards(feecollector, address, rewards);
     }
 }
