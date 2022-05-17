@@ -5,7 +5,8 @@ import MeasurementService from "@/services/MeasurementService";
 import TokenService from "@/services/TokenService";
 import {IToken} from "@/models/Token";
 import {Contract} from "web3-eth-contract";
-import { toWei } from 'web3-utils';
+import {toWei} from 'web3-utils';
+import {NetworkProvider} from "@/types/enums";
 
 /**
  * This job runs every ... hours/minutes/seconds for calculating the rewards per user and token.
@@ -21,17 +22,18 @@ export async function jobCalculateRewards() {
     console.log("Calculating the rewards");
     const WEEK_DAYS: number = 7;
 
-    const contract = getContractFromName(0, 'LimitedSupplyToken', '0xB952d9b5de7804691e7936E88915A669B15822ef');
-    const feeCollectorContract = getFeeCollectorContract(0, '0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400');
+    const contract = getContractFromName(NetworkProvider.Main, 'LimitedSupplyToken', '0xB952d9b5de7804691e7936E88915A669B15822ef');
+    const feecollector = getFeeCollectorContract(NetworkProvider.Main, '0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400')
 
     let [balanceOfFeeCollector] = await Promise.all([contract.methods.balanceOf('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400').call()]);
     if (balanceOfFeeCollector <= 0) {
         await contract.methods.transfer('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400', 1).send({
-            from: '0xB952d9b5de7804691e7936E88915A669B15822ef'
+            from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5'
         });
         balanceOfFeeCollector = await contract.methods.balanceOf('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400').call();
     }
     const dailyBalanceFeeCollector: number = balanceOfFeeCollector / WEEK_DAYS;
+
     let datePreviousWeek = new Date();
     datePreviousWeek.setDate(datePreviousWeek.getDate() - WEEK_DAYS);
 
@@ -47,7 +49,7 @@ export async function jobCalculateRewards() {
             // aggregate through the measurements, match on address and group on date
             const measurements: IMeasurement[] = await MeasurementService.getMeasurement(wallet._id, datePreviousWeek);
 
-            // foreach measurement set median and
+            // foreach measurement set median
             for (const measurement of measurements) {
                 measurementsPerToken.set(measurement, getValuesFromObject(measurement.tokens));
             }
@@ -90,10 +92,15 @@ export async function jobCalculateRewards() {
             for (const [tokenAddress, reward] of tokens) {
                 //TODO: submit that share to the smart contract mapping (address => uint)
                 // CALL PUBLISH REWARDS
+
+                console.log(address + ": | " + tokenAddress + "= " + reward);
+                await publishRewards(feecollector, address, tokenAddress, reward).then((res) => {
+                    console.log(res);
+                }).catch((err) => {
+                    console.log(err);
+                });
             }
         }
-
-        console.log(clonedRewards);
     }
 }
 
