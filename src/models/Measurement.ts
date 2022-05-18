@@ -6,12 +6,10 @@ export type IMeasurement = mongoose.Document & {
     address: string;
 };
 
-const measurementSchema = new mongoose.Schema(
-    {
-        timestamp: Date,
-        tokens: Object,
-        address: String,
-    },
-);
+const measurementSchema = new mongoose.Schema({
+    timestamp: Date,
+    tokens: Object,
+    address: String,
+});
 
 export const Measurement = mongoose.model<IMeasurement>('Measurement', measurementSchema);
