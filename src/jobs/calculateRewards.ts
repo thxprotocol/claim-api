@@ -1,12 +1,12 @@
-import {IWallet, Wallet} from '@/models/Wallet';
-import {IMeasurement} from '@/models/Measurement';
-import {getContractFromName, getFeeCollectorContract} from '@/util/network';
-import MeasurementService from "@/services/MeasurementService";
-import TokenService from "@/services/TokenService";
-import {IToken} from "@/models/Token";
-import {Contract} from "web3-eth-contract";
-import {fromWei, toWei} from 'web3-utils';
-import {NetworkProvider} from "@/types/enums";
+import { IWallet, Wallet } from '@/models/Wallet';
+import { IMeasurement } from '@/models/Measurement';
+import { getContractFromName, getFeeCollectorContract } from '@/util/network';
+import MeasurementService from '@/services/MeasurementService';
+import TokenService from '@/services/TokenService';
+import { IToken } from '@/models/Token';
+import { Contract } from 'web3-eth-contract';
+import { fromWei, toWei } from 'web3-utils';
+import { NetworkProvider } from '@/types/enums';
 
 /**
  * This job runs every ... hours/minutes/seconds for calculating the rewards per user and token.
@@ -19,38 +19,44 @@ import {NetworkProvider} from "@/types/enums";
  */
 export async function jobCalculateRewards() {
     // temporary for logging purposes
-    console.log("Calculating the rewards");
-    const WEEK_DAYS: number = 7;
+    console.log('Calculating the rewards');
+    const WEEK_DAYS = 7;
 
-    const contract = getContractFromName(NetworkProvider.Main, 'LimitedSupplyToken', '0xB952d9b5de7804691e7936E88915A669B15822ef');
-    const feecollector = getFeeCollectorContract(NetworkProvider.Main, '0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400')
+    const contract = getContractFromName(
+        NetworkProvider.Main,
+        'LimitedSupplyToken',
+        '0xB952d9b5de7804691e7936E88915A669B15822ef',
+    );
+    const feecollector = getFeeCollectorContract(NetworkProvider.Main, '0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400');
 
-    let [balanceOfFeeCollector] = await Promise.all([contract.methods.balanceOf('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400').call()]);
+    let [balanceOfFeeCollector] = await Promise.all([
+        contract.methods.balanceOf('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400').call(),
+    ]);
     if (balanceOfFeeCollector <= 0) {
         await contract.methods.transfer('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400', 1).send({
-            from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5'
+            from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5',
         });
         balanceOfFeeCollector = await contract.methods.balanceOf('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400').call();
     }
     const dailyBalanceFeeCollector: number = balanceOfFeeCollector / WEEK_DAYS;
 
-    let datePreviousWeek = new Date();
+    const datePreviousWeek = new Date();
     datePreviousWeek.setDate(datePreviousWeek.getDate() - WEEK_DAYS);
 
     // finds only the pilot wallets those who signed up BEFORE previous week
-    const wallets: IWallet[] = await Wallet.find({signedUpAt: {$lt: datePreviousWeek}});
-    let calculatedRewards = new Map<string, Map<string, number>>();
+    const wallets: IWallet[] = await Wallet.find({ signedUpAt: { $lt: datePreviousWeek } });
+    const calculatedRewards = new Map<string, Map<string, number>>();
 
     const tokens: IToken[] = await TokenService.getAllTokens();
     const tokenMap = new Map<string, string>();
-    tokens.forEach(token => {
+    tokens.forEach((token) => {
         tokenMap.set(token.type, token._id);
     });
 
     for (const wallet of wallets) {
         try {
-            let totalRewardsPerToken = new Map<string, number>();
-            let measurementsPerToken = new Map<IMeasurement, Map<string, number[]>>();
+            const totalRewardsPerToken = new Map<string, number>();
+            const measurementsPerToken = new Map<IMeasurement, Map<string, number[]>>();
 
             // aggregate through the measurements, match on address and group on date
             const measurements: IMeasurement[] = await MeasurementService.getMeasurement(wallet._id, datePreviousWeek);
@@ -64,7 +70,8 @@ export async function jobCalculateRewards() {
                 const totalMedianPerDay = await getTotalMedianDay(measurement._id);
                 for (const [token, values] of data) {
                     const medianMeasurement = await median(values);
-                    const share: number = ((medianMeasurement / totalMedianPerDay.get(token)) * 100) * (dailyBalanceFeeCollector / 100);
+                    const share: number =
+                        (medianMeasurement / totalMedianPerDay.get(token)) * 100 * (dailyBalanceFeeCollector / 100);
 
                     if (totalRewardsPerToken.get(token) == undefined) {
                         totalRewardsPerToken.set(token, 0);
@@ -75,24 +82,24 @@ export async function jobCalculateRewards() {
 
             calculatedRewards.set(wallet._id, totalRewardsPerToken);
         } catch {
-            console.log("Could not find any measurements")
+            console.log('Could not find any measurements');
         }
     }
 
     for (const [address, tokens] of calculatedRewards) {
-        let filteredMap = new Map<string, number>();
-        let rewards: Object[] = [];
-        let existingRewards: Object[] = await feecollector.methods.getRewards(address).call();
+        const filteredMap = new Map<string, number>();
+        const rewards: Object[] = [];
+        const existingRewards: Object[] = await feecollector.methods.getRewards(address).call();
 
         // sets the token id to the address (f.e DOIS = 0x03fda03f0da03f9f9df)
-        for (let key of tokenMap.keys()) {
+        for (const key of tokenMap.keys()) {
             filteredMap.set(tokenMap.get(key), tokens.get(key));
         }
 
         // merges the existing rewards with the current reward
-        existingRewards.forEach(entry => {
-            let tAddress: string = Object.values(entry)[0];
-            let tReward: number = Number(fromWei(Object.values(entry)[1]));
+        existingRewards.forEach((entry) => {
+            const tAddress: string = Object.values(entry)[0];
+            const tReward = Number(fromWei(Object.values(entry)[1]));
             filteredMap.set(tAddress.toLowerCase(), filteredMap.get(tAddress.toLowerCase()) + tReward)
         });
 
@@ -118,7 +125,7 @@ export async function jobCalculateRewards() {
 async function publishRewards(contract: Contract, address: string, rewards: Object[]) {
     // call the smart contract to set the rewards (from might change)
     return await contract.methods.setRewards(address, rewards).send({
-        from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5'
+        from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5',
     });
 }
 
@@ -127,18 +134,18 @@ async function publishRewards(contract: Contract, address: string, rewards: Obje
  * @param date The measurement that needs to match this date to.
  */
 async function getTotalMedianDay(date: string) {
-    let totalMedianPerDay = new Map<string, number>();
+    const totalMedianPerDay = new Map<string, number>();
 
     // sets date of the measurement (f.e. 2022-05-08) and the second date + 1 (f.e. 2022-05-09)
     const dateTimeFirst = new Date(date);
-    let tempTimeSecond = new Date(dateTimeFirst);
+    const tempTimeSecond = new Date(dateTimeFirst);
     const dateTimeSecond = new Date(tempTimeSecond.setDate(tempTimeSecond.getDate() + 1));
 
     // finds all the measurements between the dates above
     const measurements: IMeasurement[] = await MeasurementService.getMeasurementByDate(dateTimeFirst, dateTimeSecond);
 
     for (const measurement of measurements) {
-        let tempValuesMap = getValuesFromObject(measurement.tokens);
+        const tempValuesMap = getValuesFromObject(measurement.tokens);
 
         for (const [token, balances] of tempValuesMap) {
             if (totalMedianPerDay.get(token) == undefined) {
@@ -146,7 +153,7 @@ async function getTotalMedianDay(date: string) {
             }
 
             // add the median of balances per token to the total
-            let currentAmount = totalMedianPerDay.get(token);
+            const currentAmount = totalMedianPerDay.get(token);
             const m = await median(balances);
             totalMedianPerDay.set(token, currentAmount + m);
         }
@@ -160,11 +167,11 @@ async function getTotalMedianDay(date: string) {
  * @param tokens The combined token object of the measurement.
  */
 function getValuesFromObject(tokens: Object) {
-    let tempValuesMap = new Map<string, number[]>()
+    const tempValuesMap = new Map<string, number[]>();
 
     // for every token add a as a new key to the map
-    Object.values(tokens).forEach(m => {
-        Object.keys(m).forEach(token => {
+    Object.values(tokens).forEach((m) => {
+        Object.keys(m).forEach((token) => {
             if (tempValuesMap.get(token) == undefined) {
                 tempValuesMap.set(token, []);
             }
@@ -180,16 +187,15 @@ function getValuesFromObject(tokens: Object) {
  * @param values the token values of the measurements.
  */
 async function median(values: number[]) {
-    if(values.length ===0) throw new Error("No inputs");
+    if (values.length === 0) throw new Error('No inputs');
 
-    values.sort(function(a: number, b: number){
-        return a-b;
+    values.sort(function (a: number, b: number) {
+        return a - b;
     });
 
-    let half = Math.floor(values.length / 2);
+    const half = Math.floor(values.length / 2);
 
-    if (values.length % 2)
-        return values[half];
+    if (values.length % 2) return values[half];
 
     return (values[half - 1] + values[half]) / 2.0;
 }
