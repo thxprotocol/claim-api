@@ -7,6 +7,7 @@ import { IToken } from '@/models/Token';
 import { Contract } from 'web3-eth-contract';
 import { fromWei, toWei } from 'web3-utils';
 import { NetworkProvider } from '@/types/enums';
+import {BigNumber} from "ethers";
 
 /**
  * This job runs every ... hours/minutes/seconds for calculating the rewards per user and token.
@@ -27,18 +28,18 @@ export async function jobCalculateRewards() {
         'LimitedSupplyToken',
         '0xB952d9b5de7804691e7936E88915A669B15822ef',
     );
-    const feecollector = getFeeCollectorContract(NetworkProvider.Main, '0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400');
+    const feecollector = getFeeCollectorContract(NetworkProvider.Main, '0xe2092A19f37D2DBBfa9c41C9b83CBAAA1294548f');
 
     let [balanceOfFeeCollector] = await Promise.all([
-        contract.methods.balanceOf('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400').call(),
+        contract.methods.balanceOf('0xe2092A19f37D2DBBfa9c41C9b83CBAAA1294548f').call(),
     ]);
     if (balanceOfFeeCollector <= 0) {
-        await contract.methods.transfer('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400', 1).send({
+        await contract.methods.transfer('0xe2092A19f37D2DBBfa9c41C9b83CBAAA1294548f', BigNumber.from(toWei('1'))).send({
             from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5',
         });
-        balanceOfFeeCollector = await contract.methods.balanceOf('0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400').call();
+        balanceOfFeeCollector = await contract.methods.balanceOf('0xe2092A19f37D2DBBfa9c41C9b83CBAAA1294548f').call();
     }
-    const dailyBalanceFeeCollector: number = balanceOfFeeCollector / WEEK_DAYS;
+    const dailyBalanceFeeCollector: number = Number(fromWei((balanceOfFeeCollector / WEEK_DAYS).toString()));
 
     const datePreviousWeek = new Date();
     datePreviousWeek.setDate(datePreviousWeek.getDate() - WEEK_DAYS);
@@ -110,7 +111,7 @@ export async function jobCalculateRewards() {
                 amount: toWei(reward.toString())
             });
         }
-
+        console.log(rewards)
         // call the publish rewards method to push the rewards to the smart contract
         await publishRewards(feecollector, address, rewards);
     }
