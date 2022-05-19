@@ -22,22 +22,20 @@ export async function jobCalculateRewards() {
     // temporary for logging purposes
     console.log('Calculating the rewards');
     const WEEK_DAYS = 7;
+    const FEE_COLLECTOR_ADDRESS = '0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400';
+    const LIMITED_TOKEN_ADDRESS = '0xB952d9b5de7804691e7936E88915A669B15822ef';
 
-    const contract = getContractFromName(
-        NetworkProvider.Main,
-        'LimitedSupplyToken',
-        '0xB952d9b5de7804691e7936E88915A669B15822ef',
-    );
-    const feecollector = getFeeCollectorContract(NetworkProvider.Main, '0xe2092A19f37D2DBBfa9c41C9b83CBAAA1294548f');
+    const limitedToken = getContractFromName(NetworkProvider.Main, 'LimitedSupplyToken', LIMITED_TOKEN_ADDRESS);
+    const feeCollector = getFeeCollectorContract(NetworkProvider.Main, FEE_COLLECTOR_ADDRESS);
 
     let [balanceOfFeeCollector] = await Promise.all([
-        contract.methods.balanceOf('0xe2092A19f37D2DBBfa9c41C9b83CBAAA1294548f').call(),
+        limitedToken.methods.balanceOf(FEE_COLLECTOR_ADDRESS).call(),
     ]);
     if (balanceOfFeeCollector <= 0) {
-        await contract.methods.transfer('0xe2092A19f37D2DBBfa9c41C9b83CBAAA1294548f', BigNumber.from(toWei('1'))).send({
-            from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5',
+        await limitedToken.methods.transfer(FEE_COLLECTOR_ADDRESS, toWei('1')).send({
+            from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5'
         });
-        balanceOfFeeCollector = await contract.methods.balanceOf('0xe2092A19f37D2DBBfa9c41C9b83CBAAA1294548f').call();
+        balanceOfFeeCollector = await limitedToken.methods.balanceOf(FEE_COLLECTOR_ADDRESS).call();
     }
     const dailyBalanceFeeCollector: number = Number(fromWei((balanceOfFeeCollector / WEEK_DAYS).toString()));
 
@@ -90,7 +88,7 @@ export async function jobCalculateRewards() {
     for (const [address, tokens] of calculatedRewards) {
         const filteredMap = new Map<string, number>();
         const rewards: Object[] = [];
-        const existingRewards: Object[] = await feecollector.methods.getRewards(address).call();
+        const existingRewards: Object[] = await feeCollector.methods.getRewards(address).call();
 
         // sets the token id to the address (f.e DOIS = 0x03fda03f0da03f9f9df)
         for (const key of tokenMap.keys()) {
@@ -113,7 +111,7 @@ export async function jobCalculateRewards() {
         }
         console.log(rewards)
         // call the publish rewards method to push the rewards to the smart contract
-        await publishRewards(feecollector, address, rewards);
+        await publishRewards(feeCollector, address, rewards);
     }
 }
 
