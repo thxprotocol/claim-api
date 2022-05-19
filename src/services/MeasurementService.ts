@@ -12,7 +12,7 @@ export default class MeasurementService {
     static async getMeasurement(address: string, prevWeekDate: Date) {
         return Measurement.aggregate([
             {
-                $match: { address: address, timestamp: { $gt: prevWeekDate } },
+                $match: { address: address, timestamp: { $gte: prevWeekDate } },
             },
             {
                 $group: {

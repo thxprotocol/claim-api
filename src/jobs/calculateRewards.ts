@@ -1,13 +1,12 @@
-import { IWallet, Wallet } from '@/models/Wallet';
-import { IMeasurement } from '@/models/Measurement';
-import { getContractFromName, getFeeCollectorContract } from '@/util/network';
+import {IWallet, Wallet} from '@/models/Wallet';
+import {IMeasurement} from '@/models/Measurement';
+import {getContractFromName, getFeeCollectorContract} from '@/util/network';
 import MeasurementService from '@/services/MeasurementService';
 import TokenService from '@/services/TokenService';
-import { IToken } from '@/models/Token';
-import { Contract } from 'web3-eth-contract';
-import { fromWei, toWei } from 'web3-utils';
-import { NetworkProvider } from '@/types/enums';
-import {BigNumber} from "ethers";
+import {IToken} from '@/models/Token';
+import {Contract} from 'web3-eth-contract';
+import {fromWei, toWei} from 'web3-utils';
+import {NetworkProvider} from '@/types/enums';
 
 /**
  * This job runs every ... hours/minutes/seconds for calculating the rewards per user and token.
@@ -21,31 +20,30 @@ import {BigNumber} from "ethers";
 export async function jobCalculateRewards() {
     // temporary for logging purposes
     console.log('Calculating the rewards');
-    const WEEK_DAYS = 7;
     const FEE_COLLECTOR_ADDRESS = '0x5E0A87862f9175493Cc1d02199ad18Eff87Eb400';
     const LIMITED_TOKEN_ADDRESS = '0xB952d9b5de7804691e7936E88915A669B15822ef';
+    const WEEK_DAYS = 7;
+    const FEE_COLLECTOR_TEST_AMOUNT = 7;
 
     const limitedToken = getContractFromName(NetworkProvider.Main, 'LimitedSupplyToken', LIMITED_TOKEN_ADDRESS);
     const feeCollector = getFeeCollectorContract(NetworkProvider.Main, FEE_COLLECTOR_ADDRESS);
 
-    let [balanceOfFeeCollector] = await Promise.all([
-        limitedToken.methods.balanceOf(FEE_COLLECTOR_ADDRESS).call(),
-    ]);
-    if (balanceOfFeeCollector <= 0) {
-        await limitedToken.methods.transfer(FEE_COLLECTOR_ADDRESS, toWei('1')).send({
-            from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5'
-        });
-        balanceOfFeeCollector = await limitedToken.methods.balanceOf(FEE_COLLECTOR_ADDRESS).call();
-    }
-    const dailyBalanceFeeCollector: number = Number(fromWei((balanceOfFeeCollector / WEEK_DAYS).toString()));
+    await limitedToken.methods.transfer(FEE_COLLECTOR_ADDRESS, toWei('8')).send({
+        from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5'
+    });
 
-    const datePreviousWeek = new Date();
-    datePreviousWeek.setDate(datePreviousWeek.getDate() - WEEK_DAYS);
+    // balanceOfFeeCollector = await limitedToken.methods.balanceOf(FEE_COLLECTOR_ADDRESS).call();
+
+    const dailyBalanceFeeCollector: number = FEE_COLLECTOR_TEST_AMOUNT / WEEK_DAYS;
+
+    // gets the date prior to the current date or a custom date for testing purposes
+    const datePreviousWeek = getDate(true, new Date("March 15 2022 1:00"), WEEK_DAYS);
 
     // finds only the pilot wallets those who signed up BEFORE previous week
     const wallets: IWallet[] = await Wallet.find({ signedUpAt: { $lt: datePreviousWeek } });
     const calculatedRewards = new Map<string, Map<string, number>>();
 
+    // get all the tokens from the custom-tokens collection
     const tokens: IToken[] = await TokenService.getAllTokens();
     const tokenMap = new Map<string, string>();
     tokens.forEach((token) => {
@@ -59,6 +57,7 @@ export async function jobCalculateRewards() {
 
             // aggregate through the measurements, match on address and group on date
             const measurements: IMeasurement[] = await MeasurementService.getMeasurement(wallet._id, datePreviousWeek);
+            console.log(measurements.length);
 
             // foreach measurement set median
             for (const measurement of measurements) {
@@ -92,7 +91,7 @@ export async function jobCalculateRewards() {
 
         // sets the token id to the address (f.e DOIS = 0x03fda03f0da03f9f9df)
         for (const key of tokenMap.keys()) {
-            filteredMap.set(tokenMap.get(key), tokens.get(key));
+            filteredMap.set(tokenMap.get(key), (tokens.get(key)) == undefined ? 0 : tokens.get(key));
         }
 
         // merges the existing rewards with the current reward
@@ -101,6 +100,8 @@ export async function jobCalculateRewards() {
             const tReward = Number(fromWei(Object.values(entry)[1]));
             filteredMap.set(tAddress.toLowerCase(), filteredMap.get(tAddress.toLowerCase()) + tReward)
         });
+
+        console.log(filteredMap);
 
         // loop through the new filtered map and push the rewards to a new object list
         for (const [tokenAddress, reward] of filteredMap) {
@@ -197,4 +198,17 @@ async function median(values: number[]) {
     if (values.length % 2) return values[half];
 
     return (values[half - 1] + values[half]) / 2.0;
+}
+
+/**
+ * Helper method to get the date of the previous week to start calculating measurements
+ * @param testing Whether the application is used for testing or not.
+ * @param startDate The provided startdate for when we need to check measurements from a specific date.
+ * @param amountOfDays The amount of days in a week.
+ */
+function getDate(testing: boolean, startDate: Date, amountOfDays: number) {
+    const datePreviousWeek = new Date();
+    startDate.setDate(startDate.getDate() - amountOfDays);
+    datePreviousWeek.setDate(datePreviousWeek.getDate() - amountOfDays);
+    return (testing ? startDate : datePreviousWeek);
 }
