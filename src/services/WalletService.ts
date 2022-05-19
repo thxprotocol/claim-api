@@ -30,7 +30,7 @@ export default class WalletService {
             },
             {
                 $set: {
-                    lastActiveAt: new Date(),
+                    lastActiveAt: Date.now(),
                 },
             },
         );
