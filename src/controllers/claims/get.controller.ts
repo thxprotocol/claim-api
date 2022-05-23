@@ -5,6 +5,7 @@ export const FindWallet = async (_req: Request, res: Response) => {
     const response = await WalletService.isWalletExisting(_req.body.wallet);
     if (response) {
         res.status(200).send(true);
+    } else {
+        res.status(200).send(false);
     }
-    res.status(200).send(false);
 };
