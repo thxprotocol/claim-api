@@ -48,19 +48,12 @@ export async function jobCalculateRewards() {
     }
 
     const dailyBalanceFeeCollector: BigNumber = new BigNumber(FEE_COLLECTOR_TEST_AMOUNT).div(new BigNumber(WEEK_DAYS));
-
-    console.log(dailyBalanceFeeCollector.toString());
-
     // gets the date prior to the current date or a custom date for testing purposes
     const datePreviousWeek = getDate(true, new Date('March 15 2022 1:00'), WEEK_DAYS);
-
-    console.log(datePreviousWeek);
 
     // finds only the pilot wallets those who signed up BEFORE previous week
     const wallets: IWallet[] = await Wallet.find({ signedUpAt: { $lt: datePreviousWeek } });
     const calculatedRewards = new Map<string, Map<string, BigNumber>>();
-
-    console.log(wallets);
 
     console.group('Phase 1');
     for (const { _id, staking, lastActiveAt } of wallets) {
