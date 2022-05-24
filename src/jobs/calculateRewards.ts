@@ -1,16 +1,16 @@
-import {IWallet, Wallet} from '@/models/Wallet';
-import {IMeasurement} from '@/models/Measurement';
-import {getContractFromName, getFeeCollectorContract} from '@/util/network';
+import { IWallet, Wallet } from '@/models/Wallet';
+import { IMeasurement } from '@/models/Measurement';
+import { getContractFromName, getFeeCollectorContract } from '@/util/network';
 import MeasurementService from '@/services/MeasurementService';
 import TokenService from '@/services/TokenService';
-import {IToken} from '@/models/Token';
-import {Contract} from 'web3-eth-contract';
-import {fromWei, toWei} from 'web3-utils';
-import {NetworkProvider} from '@/types/enums';
-import {RewardEntry} from "@/models/RewardEntry";
-import WalletService from "@/services/WalletService";
-import RewardsService from "@/services/RewardsService";
-import {BigNumber} from 'bignumber.js';
+import { IToken } from '@/models/Token';
+import { Contract } from 'web3-eth-contract';
+import { fromWei, toWei } from 'web3-utils';
+import { NetworkProvider } from '@/types/enums';
+import { RewardEntry } from '@/models/RewardEntry';
+import WalletService from '@/services/WalletService';
+import RewardsService from '@/services/RewardsService';
+import { BigNumber } from 'bignumber.js';
 
 /**
  * This job runs every ... hours/minutes/seconds for calculating the rewards per user and token.
@@ -43,7 +43,7 @@ export async function jobCalculateRewards() {
         // 8 because it needs an offset from the 7 that is being distributed
         const limitedToken = getContractFromName(NetworkProvider.Main, 'LimitedSupplyToken', token._id);
         await limitedToken.methods.transfer(FEE_COLLECTOR_ADDRESS, toWei('8')).send({
-            from: MAIN_TRANSFER_ADDRESS
+            from: MAIN_TRANSFER_ADDRESS,
         });
     }
 
@@ -149,7 +149,7 @@ export async function jobCalculateRewards() {
         for (const [tokenAddress, reward] of tokens) {
             rewards.push({
                 token: tokenAddress,
-                amount: new BigNumber(reward.toFixed(0))
+                amount: new BigNumber(reward.toFixed(0)),
             });
         }
         console.log('Rewards:', rewards);
@@ -171,10 +171,10 @@ export async function jobCalculateRewards() {
  * @param mainAddress
  */
 async function publishRewards(contract: Contract, address: string, rewards: RewardEntry[], mainAddress: string) {
-    const temp = rewards.map(e => ({
+    const temp = rewards.map((e) => ({
         token: e.token,
-        amount: e.amount.toString()
-    }))
+        amount: e.amount.toString(),
+    }));
 
     // call the smart contract to set the rewards (from might change)
     return await contract.methods.setRewards(address, temp).send({
