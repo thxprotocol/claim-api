@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
+import { BigNumber } from 'bignumber.js';
 
 export type IRewards = mongoose.Document & {
     address: string;
     timestamp: Date;
-    rewards: Map<string, number>;
+    rewards: Map<string, BigNumber>;
 };
 
 const rewardsSchema = new mongoose.Schema({

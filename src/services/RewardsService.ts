@@ -1,7 +1,8 @@
 import { Rewards } from '@/models/Rewards';
+import { BigNumber } from 'bignumber.js';
 
 export default class RewardsService {
-    static async addRewards(address: string, timestamp: Date, rewards: Map<string, number>) {
+    static async addRewards(address: string, timestamp: Date, rewards: Map<string, BigNumber>) {
         return await Rewards.create({
             address: address,
             timestamp: timestamp,

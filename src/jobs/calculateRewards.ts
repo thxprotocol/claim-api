@@ -7,6 +7,10 @@ import {IToken} from '@/models/Token';
 import {Contract} from 'web3-eth-contract';
 import {fromWei, toWei} from 'web3-utils';
 import {NetworkProvider} from '@/types/enums';
+import {RewardEntry} from "@/models/RewardEntry";
+import WalletService from "@/services/WalletService";
+import RewardsService from "@/services/RewardsService";
+import {BigNumber} from 'bignumber.js';
 
 /**
  * This job runs every ... hours/minutes/seconds for calculating the rewards per user and token.
@@ -24,7 +28,7 @@ export async function jobCalculateRewards() {
     const MAIN_TRANSFER_ADDRESS = '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5';
     const WEEK_DAYS = 7;
     const INACTIVE_MONTHS = 3;
-    const FEE_COLLECTOR_TEST_AMOUNT = 7;
+    const FEE_COLLECTOR_TEST_AMOUNT = toWei('7');
 
     const feeCollector = getFeeCollectorContract(NetworkProvider.Main, FEE_COLLECTOR_ADDRESS);
 
@@ -43,14 +47,20 @@ export async function jobCalculateRewards() {
         });
     }
 
-    const dailyBalanceFeeCollector: number = FEE_COLLECTOR_TEST_AMOUNT / WEEK_DAYS;
+    const dailyBalanceFeeCollector: BigNumber = new BigNumber(FEE_COLLECTOR_TEST_AMOUNT).div(new BigNumber(WEEK_DAYS));
+
+    console.log(dailyBalanceFeeCollector.toString());
 
     // gets the date prior to the current date or a custom date for testing purposes
     const datePreviousWeek = getDate(true, new Date('March 15 2022 1:00'), WEEK_DAYS);
 
+    console.log(datePreviousWeek);
+
     // finds only the pilot wallets those who signed up BEFORE previous week
     const wallets: IWallet[] = await Wallet.find({ signedUpAt: { $lt: datePreviousWeek } });
-    const calculatedRewards = new Map<string, Map<string, number>>();
+    const calculatedRewards = new Map<string, Map<string, BigNumber>>();
+
+    console.log(wallets);
 
     console.group('Phase 1');
     for (const { _id, staking, lastActiveAt } of wallets) {
@@ -60,14 +70,14 @@ export async function jobCalculateRewards() {
             continue;
         }
 
-        let databaseRewards = new Map<string, number>();
+        let databaseRewards = new Map<string, BigNumber>();
         try {
             databaseRewards = (await RewardsService.getLastRewards(_id)).rewards;
         } catch (err) {
             console.log('No database rewards found');
         }
 
-        let contractRewards = new Map<string, number>();
+        let contractRewards = new Map<string, BigNumber>();
         try {
             contractRewards = rewardEntryToMapping(
                 decodeSolidityRewardEntries(await feeCollector.methods.getRewards(_id).call()),
@@ -79,21 +89,21 @@ export async function jobCalculateRewards() {
         // Check if wallet is inactive
         const hasRetrievedRewardsLastMonth = hasRetrievedRewards(databaseRewards, contractRewards);
         if (hasRetrievedRewardsLastMonth) {
-            WalletService.updateLastActiveAt(_id);
+            await WalletService.updateLastActiveAt(_id);
         } else {
             // Remove wallet if they've been inactive for 3 months
             const dateInactive = new Date();
             dateInactive.setMonth(dateInactive.getMonth() - INACTIVE_MONTHS);
             if (lastActiveAt < dateInactive) {
-                WalletService.removeWallet(_id);
-                MeasurementService.removeAllMeasurementsOfWallet(_id);
+                await WalletService.removeWallet(_id);
+                await MeasurementService.removeAllMeasurementsOfWallet(_id);
                 console.warn('User is inactive');
                 continue;
             }
         }
 
         try {
-            const totalRewardsPerToken = new Map<string, number>();
+            const totalRewardsPerToken = new Map<string, BigNumber>();
             const measurementsPerToken = new Map<IMeasurement, Map<string, number[]>>();
 
             // aggregate through the measurements, match on address and group on date
@@ -110,14 +120,17 @@ export async function jobCalculateRewards() {
             for (const [measurement, data] of measurementsPerToken) {
                 const totalMedianPerDay = await getTotalMedianDay(measurement._id);
                 for (const [token, values] of data) {
-                    const medianMeasurement = await median(values);
-                    const share: number =
-                        (medianMeasurement / totalMedianPerDay.get(token)) * 100 * (dailyBalanceFeeCollector / 100);
+                    const medianMeasurement = await new BigNumber(median(values));
+                    const totalMedian = new BigNumber(totalMedianPerDay.get(token));
+
+                    const leftSide = new BigNumber(medianMeasurement).div(totalMedian).multipliedBy(100);
+                    const rightSide = dailyBalanceFeeCollector.div(100);
+                    const share = leftSide.multipliedBy(rightSide);
 
                     if (totalRewardsPerToken.get(token) == undefined) {
-                        totalRewardsPerToken.set(token, 0);
+                        totalRewardsPerToken.set(token, new BigNumber(0));
                     }
-                    totalRewardsPerToken.set(token, totalRewardsPerToken.get(token) + share);
+                    totalRewardsPerToken.set(token, totalRewardsPerToken.get(token).plus(share));
                 }
             }
 
@@ -136,14 +149,14 @@ export async function jobCalculateRewards() {
 
         // merges the existing rewards with the current reward
         existingRewards.forEach(({ token, amount }) => {
-            tokens.set(token.toLowerCase(), (tokens.get(token.toLowerCase()) || 0) + Number(amount));
+            tokens.set(token.toLowerCase(), (tokens.get(token.toLowerCase()) || new BigNumber(0)).plus(amount));
         });
 
         // loop through the new filtered map and push the rewards to a new object list
         for (const [tokenAddress, reward] of tokens) {
             rewards.push({
                 token: tokenAddress,
-                amount: reward,
+                amount: new BigNumber(reward.toFixed(0))
             });
         }
         console.log('Rewards:', rewards);
@@ -151,7 +164,7 @@ export async function jobCalculateRewards() {
         if (rewards.length > 0) {
             // call the publish rewards method to push the rewards to the smart contract
             await publishRewards(feeCollector, address, rewards, MAIN_TRANSFER_ADDRESS);
-            RewardsService.addRewards(address, new Date(), rewardEntryToMapping(rewards));
+            await RewardsService.addRewards(address, new Date(), rewardEntryToMapping(rewards));
         }
     }
     console.groupEnd();
@@ -164,9 +177,14 @@ export async function jobCalculateRewards() {
  * @param rewards
  * @param mainAddress
  */
-async function publishRewards(contract: Contract, address: string, rewards: Object[], mainAddress: string) {
+async function publishRewards(contract: Contract, address: string, rewards: RewardEntry[], mainAddress: string) {
+    const temp = rewards.map(e => ({
+        token: e.token,
+        amount: e.amount.toString()
+    }))
+
     // call the smart contract to set the rewards (from might change)
-    return await contract.methods.setRewards(address, rewards).send({
+    return await contract.methods.setRewards(address, temp).send({
         from: mainAddress,
     });
 }
@@ -261,7 +279,7 @@ function getDate(testing: boolean, startDate: Date, amountOfDays: number) {
  * @param contract mapping retrieved from contract
  * @returns true if the mappings are the same
  */
-export function hasRetrievedRewards(database: Map<string, number>, contract: Map<string, number>): boolean {
+export function hasRetrievedRewards(database: Map<string, BigNumber>, contract: Map<string, BigNumber>): boolean {
     if (database.size != contract.size) return true;
 
     for (const [address, amount] of database) {
@@ -277,12 +295,12 @@ export function hasRetrievedRewards(database: Map<string, number>, contract: Map
 function decodeSolidityRewardEntries(entries: unknown[][]): RewardEntry[] {
     return entries.map((entry) => ({
         token: entry[0].toString(),
-        amount: Number(entry[1].toString()),
+        amount: new BigNumber(entry[1].toString()),
     }));
 }
 
-function rewardEntryToMapping(entries: RewardEntry[]): Map<string, number> {
-    const mapping = new Map<string, number>();
+function rewardEntryToMapping(entries: RewardEntry[]): Map<string, BigNumber> {
+    const mapping = new Map<string, BigNumber>();
     for (const entry of entries) {
         mapping.set(entry.token, entry.amount);
     }
