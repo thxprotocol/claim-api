@@ -26,7 +26,7 @@ db.connection.once('open', async () => {
         skipImmediate: true,
     });
 
-    await agenda.every('169 hours', eventNameCalculateRewards);
+    await agenda.every('0 1 * * 0', eventNameCalculateRewards);
 
     logger.info('Started agenda processing');
 });
