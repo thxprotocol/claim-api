@@ -14,12 +14,12 @@ import { BigNumber } from 'bignumber.js';
 
 /**
  * This job runs every ... hours/minutes/seconds for calculating the rewards per user and token.
- * 1 (NOT COMPLETELY DONE YET). It fetches the balances per token.
+ * 1. It fetches the balances per token (IMPORTANT: for testing purposes a static share amount per token, which is 7).
  * 2. It groups the measurements from the database per wallet by date (f.e 3 measurements on 2022-05-02 of 0x342b3fda..).
  * 3. After collecting and grouping the measurements we calculate the median per token in that measurement (f.e: THX: 356, DOIS: 240).
  * 4. After calculating the median per measurement of every wallet we store the total measurements of every wallet.
  * 5. It now runs the calculation: ((median / totalMedian) * 100) * (dailyBalanceFeeCollector / 100) for every token and stores it per wallet.
- * 6 (NOT COMPLETELY DONE YET). Submit these values to the smart contract per wallet.
+ * 6. Submit these values to the smart contract per wallet.
  */
 export async function jobCalculateRewards() {
     // temporary for logging purposes
@@ -47,6 +47,7 @@ export async function jobCalculateRewards() {
         });
     }
 
+    // set the daily fee balance, for now 70000000... WEI / 7 (days per week) = 10000000... WEI distributed per TOKEN
     const dailyBalanceFeeCollector: BigNumber = new BigNumber(FEE_COLLECTOR_TEST_AMOUNT).div(new BigNumber(WEEK_DAYS));
     // gets the date prior to the current date or a custom date for testing purposes
     const datePreviousWeek = getDate(true, new Date('March 15 2022 1:00'), WEEK_DAYS);
@@ -116,13 +117,16 @@ export async function jobCalculateRewards() {
                     const medianMeasurement = await new BigNumber(median(values));
                     const totalMedian = new BigNumber(totalMedianPerDay.get(token));
 
+                    // calculate the share which is ((median / total median) * 100) * (dailyFeeBalance / 100)
                     const leftSide = new BigNumber(medianMeasurement).div(totalMedian).multipliedBy(100);
                     const rightSide = dailyBalanceFeeCollector.div(100);
                     const share = leftSide.multipliedBy(rightSide);
 
+                    // when there is no token in the total rewards yet add the token with 0 as value
                     if (totalRewardsPerToken.get(token) == undefined) {
                         totalRewardsPerToken.set(token, new BigNumber(0));
                     }
+                    // add the share to the token in the map
                     totalRewardsPerToken.set(token, totalRewardsPerToken.get(token).plus(share));
                 }
             }
