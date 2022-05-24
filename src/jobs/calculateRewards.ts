@@ -2,14 +2,12 @@ import { IWallet, Wallet } from '@/models/Wallet';
 import { IMeasurement } from '@/models/Measurement';
 import { getContractFromName, getFeeCollectorContract } from '@/util/network';
 import MeasurementService from '@/services/MeasurementService';
-import TokenService from '@/services/TokenService';
-import { IToken } from '@/models/Token';
 import { Contract } from 'web3-eth-contract';
-import { fromWei, toWei } from 'web3-utils';
+import { toWei } from 'web3-utils';
 import { NetworkProvider } from '@/types/enums';
 import WalletService from '@/services/WalletService';
 import RewardsService from '@/services/RewardsService';
-import { IRewards } from '@/models/Rewards';
+import { RewardEntry } from '@/models/RewardEntry';
 
 /**
  * This job runs every ... hours/minutes/seconds for calculating the rewards per user and token.
@@ -36,16 +34,9 @@ export async function jobCalculateRewards() {
         from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5',
     });
 
-    // get all the tokens from the custom-tokens collection
-    const tokens: IToken[] = await TokenService.getAllTokens();
-    const tokenMap = new Map<string, string>();
-    tokens.forEach((token) => {
-        tokenMap.set(token.type, token._id);
-    });
-
     // TODO: Replace with actual balance of smart contract
     // const balanceOfFeeCollector = await limitedToken.methods.balanceOf(FEE_COLLECTOR_ADDRESS).call();
-    const balanceOfFeeCollector = 7;
+    const balanceOfFeeCollector = Number(toWei('7'));
 
     const dailyBalanceFeeCollector: number = balanceOfFeeCollector / WEEK_DAYS;
 
@@ -64,18 +55,37 @@ export async function jobCalculateRewards() {
             continue;
         }
 
-        // Remove inactive wallets
-        const dateInactive = new Date();
-        dateInactive.setMonth(dateInactive.getMonth() - INACTIVE_MONTHS);
-        if (lastActiveAt < dateInactive) {
-            WalletService.removeWallet(_id);
-            MeasurementService.removeAllMeasurementsOfWallet(_id);
-            console.warn('User is inactive');
-            continue;
+        let databaseRewards = new Map<string, number>();
+        try {
+            databaseRewards = (await RewardsService.getLastRewards(_id)).rewards;
+        } catch (err) {
+            console.log('No database rewards found');
         }
 
-        // TODO: Check if every wallet claimed any of their last rewards
-        // const lastReward: IRewards = await RewardsService.getLastRewards(_id);
+        let contractRewards = new Map<string, number>();
+        try {
+            contractRewards = rewardEntryToMapping(
+                decodeSolidityRewardEntries(await feeCollector.methods.getRewards(_id).call()),
+            );
+        } catch (err) {
+            console.log('No contract rewards found');
+        }
+
+        // Check if wallet is inactive
+        const hasRetrievedRewardsLastMonth = hasRetrievedRewards(databaseRewards, contractRewards);
+        if (hasRetrievedRewardsLastMonth) {
+            WalletService.updateLastActiveAt(_id);
+        } else {
+            // Remove wallet if they've been inactive for 3 months
+            const dateInactive = new Date();
+            dateInactive.setMonth(dateInactive.getMonth() - INACTIVE_MONTHS);
+            if (lastActiveAt < dateInactive) {
+                WalletService.removeWallet(_id);
+                MeasurementService.removeAllMeasurementsOfWallet(_id);
+                console.warn('User is inactive');
+                continue;
+            }
+        }
 
         try {
             const totalRewardsPerToken = new Map<string, number>();
@@ -107,10 +117,7 @@ export async function jobCalculateRewards() {
             }
 
             console.log('Rewards:', totalRewardsPerToken);
-            if (totalRewardsPerToken.size > 0) {
-                calculatedRewards.set(_id, totalRewardsPerToken);
-                RewardsService.addRewards(_id, new Date(), totalRewardsPerToken);
-            }
+            calculatedRewards.set(_id, totalRewardsPerToken);
         } catch {
             console.error('Could not find any measurements');
         }
@@ -119,33 +126,28 @@ export async function jobCalculateRewards() {
 
     console.group('Phase 2');
     for (const [address, tokens] of calculatedRewards) {
-        const filteredMap = new Map<string, number>();
-        const rewards: Object[] = [];
-        const existingRewards: Object[] = await feeCollector.methods.getRewards(address).call();
-
-        // sets the token id to the address (f.e DOIS = 0x03fda03f0da03f9f9df)
-        for (const key of tokenMap.keys()) {
-            filteredMap.set(tokenMap.get(key), tokens.get(key) == undefined ? 0 : tokens.get(key));
-        }
+        const rewards: RewardEntry[] = [];
+        const existingRewards = decodeSolidityRewardEntries(await feeCollector.methods.getRewards(address).call());
 
         // merges the existing rewards with the current reward
-        existingRewards.forEach((entry) => {
-            const tAddress: string = Object.values(entry)[0];
-            const tReward = Number(fromWei(Object.values(entry)[1]));
-            filteredMap.set(tAddress.toLowerCase(), filteredMap.get(tAddress.toLowerCase()) + tReward);
+        existingRewards.forEach(({ token, amount }) => {
+            tokens.set(token.toLowerCase(), (tokens.get(token.toLowerCase()) || 0) + Number(amount));
         });
 
         // loop through the new filtered map and push the rewards to a new object list
-        for (const [tokenAddress, reward] of filteredMap) {
+        for (const [tokenAddress, reward] of tokens) {
             rewards.push({
                 token: tokenAddress,
-                amount: toWei(reward.toString()),
+                amount: reward,
             });
         }
         console.log('Rewards:', rewards);
 
-        // call the publish rewards method to push the rewards to the smart contract
-        await publishRewards(feeCollector, address, rewards);
+        if (rewards.length > 0) {
+            // call the publish rewards method to push the rewards to the smart contract
+            await publishRewards(feeCollector, address, rewards);
+            RewardsService.addRewards(address, new Date(), rewardEntryToMapping(rewards));
+        }
     }
     console.groupEnd();
 }
@@ -156,7 +158,7 @@ export async function jobCalculateRewards() {
  * @param address The address of the account that the rewards will be awarded to.
  * @param rewards
  */
-async function publishRewards(contract: Contract, address: string, rewards: Object[]) {
+async function publishRewards(contract: Contract, address: string, rewards: RewardEntry[]) {
     // call the smart contract to set the rewards (from might change)
     return await contract.methods.setRewards(address, rewards).send({
         from: '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5',
@@ -220,7 +222,7 @@ function getValuesFromObject(tokens: Object) {
  * Helper method to calculate the median based on the values of every token in the measurement.
  * @param values the token values of the measurements.
  */
-async function median(values: number[]) {
+function median(values: number[]) {
     if (values.length === 0) throw new Error('No inputs');
 
     values.sort(function (a: number, b: number) {
@@ -237,7 +239,7 @@ async function median(values: number[]) {
 /**
  * Helper method to get the date of the previous week to start calculating measurements
  * @param testing Whether the application is used for testing or not.
- * @param startDate The provided startdate for when we need to check measurements from a specific date.
+ * @param startDate The provided start date for when we need to check measurements from a specific date.
  * @param amountOfDays The amount of days in a week.
  */
 function getDate(testing: boolean, startDate: Date, amountOfDays: number) {
@@ -245,4 +247,38 @@ function getDate(testing: boolean, startDate: Date, amountOfDays: number) {
     startDate.setDate(startDate.getDate() - amountOfDays);
     datePreviousWeek.setDate(datePreviousWeek.getDate() - amountOfDays);
     return testing ? startDate : datePreviousWeek;
+}
+
+/**
+ * Helper to check if any rewards have been claimed
+ * @param database mapping saved in the database
+ * @param contract mapping retrieved from contract
+ * @returns true if the mappings are the same
+ */
+export function hasRetrievedRewards(database: Map<string, number>, contract: Map<string, number>): boolean {
+    if (database.size != contract.size) return true;
+
+    for (const [address, amount] of database) {
+        if (!contract.has(address)) return true;
+
+        const contractVal = contract.get(address);
+        if (!contractVal || contractVal != amount) return true;
+    }
+
+    return false;
+}
+
+function decodeSolidityRewardEntries(entries: unknown[][]): RewardEntry[] {
+    return entries.map((entry) => ({
+        token: entry[0].toString(),
+        amount: Number(entry[1].toString()),
+    }));
+}
+
+function rewardEntryToMapping(entries: RewardEntry[]): Map<string, number> {
+    const mapping = new Map<string, number>();
+    for (const entry of entries) {
+        mapping.set(entry.token, entry.amount);
+    }
+    return mapping;
 }

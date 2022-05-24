@@ -3,13 +3,16 @@ import mongoose from 'mongoose';
 export type IRewards = mongoose.Document & {
     address: string;
     timestamp: Date;
-    rewards: Object;
+    rewards: Map<string, number>;
 };
 
 const rewardsSchema = new mongoose.Schema({
     address: String,
     timestamp: Date,
-    rewards: Object,
+    rewards: {
+        type: Map,
+        of: Number,
+    },
 });
 
 export const Rewards = mongoose.model<IRewards>('Rewards', rewardsSchema);

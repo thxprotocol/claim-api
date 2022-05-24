@@ -1,7 +1,7 @@
 import { Rewards } from '@/models/Rewards';
 
 export default class RewardsService {
-    static async addRewards(address: string, timestamp: Date, rewards: Object) {
+    static async addRewards(address: string, timestamp: Date, rewards: Map<string, number>) {
         return await Rewards.create({
             address: address,
             timestamp: timestamp,
@@ -14,9 +14,10 @@ export default class RewardsService {
             {
                 address: address,
             },
+            null,
             {
                 sort: {
-                    timestamp: -1,
+                    _id: -1,
                 },
             },
         );

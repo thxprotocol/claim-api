@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { COV_PRIVATE_KEY } from '@/config/secrets';
 import WalletService from '@/services/WalletService';
-import { fromWei } from 'web3-utils';
 import MeasurementService from '@/services/MeasurementService';
 
 export async function measureBalances() {
@@ -14,16 +13,16 @@ export async function measureBalances() {
     const wallets = await WalletService.getAllWallets();
 
     // Retrieve the balances for all wallets available
-    for (let i = 0; i < wallets.length; i++) {
+    for (const { _id } of wallets) {
         let tokens: { [k: string]: number } = {};
 
         // Polygon Chain for Custom tokens like DOIS
-        const balance: { [k: string]: any } = await fetchBalance(POLYGON_CHAIN_ID, wallets[i]._id);
+        const balance: { [k: string]: any } = await fetchBalance(POLYGON_CHAIN_ID, _id);
         tokens = procesResponse(balance, tokens);
 
         // If the wallet doesn't hold any of our token, ignore.
-        if (Object.keys(tokens).length >= 1) {
-            await MeasurementService.addMeasurement(wallets[i]._id, timeOfMeasurement, tokens);
+        if (Object.keys(tokens).length > 0) {
+            await MeasurementService.addMeasurement(_id, timeOfMeasurement, tokens);
         }
     }
 }
@@ -45,7 +44,7 @@ async function fetchBalance(chainId: number, address: string) {
 function procesResponse(balance: { [k: string]: any }, tokens: { [k: string]: number }) {
     // The response is in WEI, convert to Ether.
     for (let i = 0; i < balance.length; i++) {
-        tokens[balance[i].contract_ticker_symbol] = +fromWei(balance[i].balance, 'ether');
+        tokens[balance[i].contract_address] = +Number(balance[i].balance);
     }
 
     return tokens;
