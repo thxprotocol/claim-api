@@ -97,39 +97,13 @@ export async function jobCalculateRewards() {
         }
 
         try {
-            const totalRewardsPerToken = new Map<string, BigNumber>();
-            const measurementsPerToken = new Map<IMeasurement, Map<string, number[]>>();
-
             // aggregate through the measurements, match on address and group on date
             const measurements: IMeasurement[] = await MeasurementService.getMeasurement(_id, datePreviousWeek);
 
             console.log(measurements.length, 'Measurements found');
             if (measurements.length != 7) throw new Error('Insufficient measurements');
 
-            // foreach measurement set median
-            for (const measurement of measurements) {
-                measurementsPerToken.set(measurement, getValuesFromObject(measurement.tokens));
-            }
-
-            for (const [measurement, data] of measurementsPerToken) {
-                const totalMedianPerDay = await getTotalMedianDay(measurement._id);
-                for (const [token, values] of data) {
-                    const medianMeasurement = await new BigNumber(median(values));
-                    const totalMedian = new BigNumber(totalMedianPerDay.get(token));
-
-                    // calculate the share which is ((median / total median) * 100) * (dailyFeeBalance / 100)
-                    const leftSide = new BigNumber(medianMeasurement).div(totalMedian).multipliedBy(100);
-                    const rightSide = dailyBalanceFeeCollector.div(100);
-                    const share = leftSide.multipliedBy(rightSide);
-
-                    // when there is no token in the total rewards yet add the token with 0 as value
-                    if (totalRewardsPerToken.get(token) == undefined) {
-                        totalRewardsPerToken.set(token, new BigNumber(0));
-                    }
-                    // add the share to the token in the map
-                    totalRewardsPerToken.set(token, totalRewardsPerToken.get(token).plus(share));
-                }
-            }
+            let totalRewardsPerToken = await calculateShare(measurements, dailyBalanceFeeCollector);
 
             console.log('Rewards:', totalRewardsPerToken);
             calculatedRewards.set(_id, totalRewardsPerToken);
@@ -165,6 +139,43 @@ export async function jobCalculateRewards() {
         }
     }
     console.groupEnd();
+}
+
+/**
+ * Method to calculate and store the share per token locally in a map to be stored in the final map later.
+ * @param measurements The measurements from the database grouped by tokens per day f.e [3000, 4000, 5000]
+ * @param dailyBalanceFeeCollector The daily balance that can be distributed among the users PER token (f.e 7 for THX, 7 for DOIS, etc).
+ */
+async function calculateShare(measurements: IMeasurement[], dailyBalanceFeeCollector: BigNumber) {
+    const measurementsPerToken = new Map<IMeasurement, Map<string, number[]>>();
+    const totalRewardsPerToken = new Map<string, BigNumber>();
+
+    // foreach measurement set median
+    for (const measurement of measurements) {
+        measurementsPerToken.set(measurement, getValuesFromObject(measurement.tokens));
+    }
+
+    for (const [measurement, data] of measurementsPerToken) {
+        const totalMedianPerDay = await getTotalMedianDay(measurement._id);
+        for (const [token, values] of data) {
+            const medianMeasurement = await new BigNumber(median(values));
+            const totalMedian = new BigNumber(totalMedianPerDay.get(token));
+
+            // calculate the share which is ((median / total median) * 100) * (dailyFeeBalance / 100)
+            const leftSide = new BigNumber(medianMeasurement).div(totalMedian).multipliedBy(100);
+            const rightSide = dailyBalanceFeeCollector.div(100);
+            const share = leftSide.multipliedBy(rightSide);
+
+            // when there is no token in the total rewards yet add the token with 0 as value
+            if (totalRewardsPerToken.get(token) == undefined) {
+                totalRewardsPerToken.set(token, new BigNumber(0));
+            }
+            // add the share to the token in the map
+            totalRewardsPerToken.set(token, totalRewardsPerToken.get(token).plus(share));
+        }
+    }
+
+    return totalRewardsPerToken;
 }
 
 /**
