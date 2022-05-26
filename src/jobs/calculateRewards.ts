@@ -1,19 +1,20 @@
-import { IWallet, Wallet } from '@/models/Wallet';
+import { IWallet } from '@/models/Wallet';
 import { IMeasurement } from '@/models/Measurement';
 import { getContractFromName, getFeeCollectorContract } from '@/util/network';
 import MeasurementService from '@/services/MeasurementService';
 import TokenService from '@/services/TokenService';
 import { IToken } from '@/models/Token';
 import { Contract } from 'web3-eth-contract';
-import { fromWei, toWei } from 'web3-utils';
+import { toWei } from 'web3-utils';
 import { NetworkProvider } from '@/types/enums';
 import { RewardEntry } from '@/models/RewardEntry';
 import WalletService from '@/services/WalletService';
 import RewardsService from '@/services/RewardsService';
 import { BigNumber } from 'bignumber.js';
+import { FEE_COLLECTOR_ADDRESS, NODE_ENV } from '@/config/secrets';
 
 /**
- * This job runs every ... hours/minutes/seconds for calculating the rewards per user and token.
+ * This job runs every 7 days for calculating the rewards per user and token.
  * 1. It fetches the balances per token (IMPORTANT: for testing purposes a static share amount per token, which is 7).
  * 2. It groups the measurements from the database per wallet by date (f.e 3 measurements on 2022-05-02 of 0x342b3fda..).
  * 3. After collecting and grouping the measurements we calculate the median per token in that measurement (f.e: THX: 356, DOIS: 240).
@@ -24,11 +25,10 @@ import { BigNumber } from 'bignumber.js';
 export async function jobCalculateRewards() {
     // temporary for logging purposes
     console.log('Calculating the rewards');
-    const FEE_COLLECTOR_ADDRESS = '0xD4702511e43E2b778b34185A59728B57bE61aEd1';
-    const MAIN_TRANSFER_ADDRESS = '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5';
     const WEEK_DAYS = 7;
     const INACTIVE_MONTHS = 3;
     const FEE_COLLECTOR_TEST_AMOUNT = toWei('7');
+    const MAIN_TRANSFER_ADDRESS = '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5';
 
     const feeCollector = getFeeCollectorContract(NetworkProvider.Main, FEE_COLLECTOR_ADDRESS);
 
@@ -36,15 +36,17 @@ export async function jobCalculateRewards() {
     const tokens: IToken[] = await TokenService.getAllTokens();
     const tokenMap = new Map<string, string>();
 
-    for (const token of tokens) {
-        tokenMap.set(token.type, token._id);
+    if (NODE_ENV == 'development') {
+        for (const token of tokens) {
+            tokenMap.set(token.type, token._id);
 
-        // sends 8 eth to the fee collector address PER token for testing purposes.
-        // 8 because it needs an offset from the 7 that is being distributed
-        const limitedToken = getContractFromName(NetworkProvider.Main, 'LimitedSupplyToken', token._id);
-        await limitedToken.methods.transfer(FEE_COLLECTOR_ADDRESS, toWei('8')).send({
-            from: MAIN_TRANSFER_ADDRESS,
-        });
+            // sends 8 eth to the fee collector address PER token for testing purposes.
+            // 8 because it needs an offset from the 7 that is being distributed
+            const limitedToken = getContractFromName(NetworkProvider.Main, 'LimitedSupplyToken', token._id);
+            await limitedToken.methods.transfer(FEE_COLLECTOR_ADDRESS, toWei('8')).send({
+                from: MAIN_TRANSFER_ADDRESS,
+            });
+        }
     }
 
     // set the daily fee balance, for now 70000000... WEI / 7 (days per week) = 10000000... WEI distributed per TOKEN
@@ -53,7 +55,7 @@ export async function jobCalculateRewards() {
     const datePreviousWeek = getDate(true, new Date('March 15 2022 1:00'), WEEK_DAYS);
 
     // finds only the pilot wallets those who signed up BEFORE previous week
-    const wallets: IWallet[] = await Wallet.find({ signedUpAt: { $lt: datePreviousWeek } });
+    const wallets: IWallet[] = await WalletService.getWalletsBeforeDate(datePreviousWeek);
     const calculatedRewards = new Map<string, Map<string, BigNumber>>();
 
     console.group('Phase 1');
@@ -68,7 +70,7 @@ export async function jobCalculateRewards() {
         try {
             databaseRewards = (await RewardsService.getLastRewards(_id)).rewards;
         } catch (err) {
-            console.log('No database rewards found');
+            console.error('No database rewards found');
         }
 
         let contractRewards = new Map<string, BigNumber>();
@@ -77,7 +79,7 @@ export async function jobCalculateRewards() {
                 decodeSolidityRewardEntries(await feeCollector.methods.getRewards(_id).call()),
             );
         } catch (err) {
-            console.log('No contract rewards found');
+            console.error('No contract rewards found');
         }
 
         // Check if wallet is inactive
@@ -101,9 +103,9 @@ export async function jobCalculateRewards() {
             const measurements: IMeasurement[] = await MeasurementService.getMeasurement(_id, datePreviousWeek);
 
             console.log(measurements.length, 'Measurements found');
-            if (measurements.length != 7) throw new Error('Insufficient measurements');
+            if (measurements.length != WEEK_DAYS) throw new Error('Insufficient measurements');
 
-            let totalRewardsPerToken = await calculateShare(measurements, dailyBalanceFeeCollector);
+            const totalRewardsPerToken = await calculateShare(measurements, dailyBalanceFeeCollector);
 
             console.log('Rewards:', totalRewardsPerToken);
             calculatedRewards.set(_id, totalRewardsPerToken);
@@ -160,7 +162,7 @@ async function calculateShare(measurements: IMeasurement[], dailyBalanceFeeColle
         const totalMedianPerDay = await getTotalMedianDay(measurement._id);
         for (const [token, values] of data) {
             // call the algorithm calculation and store the share
-            const share = calculation(values, totalMedianPerDay.get(token), dailyBalanceFeeCollector)
+            const share = calculation(values, totalMedianPerDay.get(token), dailyBalanceFeeCollector);
 
             // when there is no token in the total rewards yet add the token with 0 as value
             if (totalRewardsPerToken.get(token) == undefined) {
@@ -232,8 +234,8 @@ async function getTotalMedianDay(date: string) {
 
             // add the median of balances per token to the total
             const currentAmount = totalMedianPerDay.get(token);
-            const m = await median(balances);
-            totalMedianPerDay.set(token, currentAmount + m);
+            const medianOfDay = median(balances);
+            totalMedianPerDay.set(token, currentAmount + medianOfDay);
         }
     }
 

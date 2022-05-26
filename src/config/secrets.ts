@@ -62,3 +62,4 @@ export const INFURA_GAS_TANK = process.env.INFURA_GAS_TANK;
 export const ITX_ACTIVE = process.env.ITX_ACTIVE === 'true' || process.env.ITX_ACTIVE === '1';
 export const COV_PRIVATE_KEY = process.env.COV_PRIVATE_KEY;
 export const INSERT_WALLET_KEY = process.env.KEYPHRASE_ADD_TOKEN;
+export const FEE_COLLECTOR_ADDRESS = process.env.FEE_COLLECTOR_ADDRESS || '0xD4702511e43E2b778b34185A59728B57bE61aEd1';
