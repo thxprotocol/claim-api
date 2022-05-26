@@ -125,6 +125,7 @@ export async function jobCalculateRewards() {
 
         // loop through the new filtered map and push the rewards to a new object list
         for (const [tokenAddress, reward] of tokens) {
+            console.log(reward.toString());
             rewards.push({
                 token: tokenAddress,
                 amount: new BigNumber(reward.toFixed(0)),
@@ -158,13 +159,8 @@ async function calculateShare(measurements: IMeasurement[], dailyBalanceFeeColle
     for (const [measurement, data] of measurementsPerToken) {
         const totalMedianPerDay = await getTotalMedianDay(measurement._id);
         for (const [token, values] of data) {
-            const medianMeasurement = await new BigNumber(median(values));
-            const totalMedian = new BigNumber(totalMedianPerDay.get(token));
-
-            // calculate the share which is ((median / total median) * 100) * (dailyFeeBalance / 100)
-            const leftSide = new BigNumber(medianMeasurement).div(totalMedian).multipliedBy(100);
-            const rightSide = dailyBalanceFeeCollector.div(100);
-            const share = leftSide.multipliedBy(rightSide);
+            // call the algorithm calculation and store the share
+            const share = calculation(values, totalMedianPerDay.get(token), dailyBalanceFeeCollector)
 
             // when there is no token in the total rewards yet add the token with 0 as value
             if (totalRewardsPerToken.get(token) == undefined) {
@@ -176,6 +172,20 @@ async function calculateShare(measurements: IMeasurement[], dailyBalanceFeeColle
     }
 
     return totalRewardsPerToken;
+}
+
+/**
+ * Helper function to run the algorithm calculation.
+ */
+export function calculation(values: number[], total: number, dailyBalanceFeeCollector: BigNumber) {
+    const medianMeasurement = new BigNumber(median(values));
+    const totalMedian = new BigNumber(total);
+
+    // calculate the share which is ((median / total median) * 100) * (dailyFeeBalance / 100)
+    const leftSide = new BigNumber(medianMeasurement).div(totalMedian).multipliedBy(100);
+    const rightSide = dailyBalanceFeeCollector.div(100);
+
+    return leftSide.multipliedBy(rightSide);
 }
 
 /**
