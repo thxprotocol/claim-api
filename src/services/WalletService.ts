@@ -43,4 +43,8 @@ export default class WalletService {
             },
         });
     }
+
+    static async isWalletExisting(address: string) {
+        return await Wallet.exists({ _id: address });
+    }
 }
