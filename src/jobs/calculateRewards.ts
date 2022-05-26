@@ -264,7 +264,7 @@ function getValuesFromObject(tokens: Object) {
  * Helper method to calculate the median based on the values of every token in the measurement.
  * @param values the token values of the measurements.
  */
-function median(values: number[]) {
+export function median(values: number[]) {
     if (values.length === 0) throw new Error('No inputs');
 
     values.sort(function (a: number, b: number) {
