@@ -11,7 +11,7 @@ import { RewardEntry } from '@/models/RewardEntry';
 import WalletService from '@/services/WalletService';
 import RewardsService from '@/services/RewardsService';
 import { BigNumber } from 'bignumber.js';
-import { FEE_COLLECTOR_ADDRESS, NODE_ENV } from '@/config/secrets';
+import { FEE_COLLECTOR_ADDRESS, MAIN_TRANSFER_ADDRESS, NODE_ENV } from '@/config/secrets';
 
 /**
  * This job runs every 7 days for calculating the rewards per user and token.
@@ -28,7 +28,6 @@ export async function jobCalculateRewards() {
     const WEEK_DAYS = 7;
     const INACTIVE_MONTHS = 3;
     const FEE_COLLECTOR_TEST_AMOUNT = toWei('7');
-    const MAIN_TRANSFER_ADDRESS = '0x08302cf8648a961c607e3e7bd7b7ec3230c2a6c5';
 
     const feeCollector = getFeeCollectorContract(NetworkProvider.Main, FEE_COLLECTOR_ADDRESS);
 
@@ -52,7 +51,7 @@ export async function jobCalculateRewards() {
     // set the daily fee balance, for now 70000000... WEI / 7 (days per week) = 10000000... WEI distributed per TOKEN
     const dailyBalanceFeeCollector: BigNumber = new BigNumber(FEE_COLLECTOR_TEST_AMOUNT).div(new BigNumber(WEEK_DAYS));
     // gets the date prior to the current date or a custom date for testing purposes
-    const datePreviousWeek = getDate(true, new Date('March 15 2022 1:00'), WEEK_DAYS);
+    const datePreviousWeek = getDate(true, new Date(NODE_ENV == 'development' ? 'March 15 2022 1:00' : ''), WEEK_DAYS);
 
     // finds only the pilot wallets those who signed up BEFORE previous week
     const wallets: IWallet[] = await WalletService.getWalletsBeforeDate(datePreviousWeek);
@@ -198,13 +197,13 @@ export function calculation(values: number[], total: number, dailyBalanceFeeColl
  * @param mainAddress
  */
 async function publishRewards(contract: Contract, address: string, rewards: RewardEntry[], mainAddress: string) {
-    const temp = rewards.map((e) => ({
+    const rewardsMappedAsStringAmount = rewards.map((e) => ({
         token: e.token,
         amount: e.amount.toString(),
     }));
 
     // call the smart contract to set the rewards (from might change)
-    return await contract.methods.setRewards(address, temp).send({
+    return await contract.methods.setRewards(address, rewardsMappedAsStringAmount).send({
         from: mainAddress,
     });
 }
