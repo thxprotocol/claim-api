@@ -1,6 +1,6 @@
 import express from 'express';
-import {FindWallet} from "@/controllers/claims/get.controller";
-import {InsertWallet} from "@/controllers/claims/post.controller";
+import { FindWallet } from '@/controllers/claims/get.controller';
+import { InsertWallet } from '@/controllers/claims/post.controller';
 
 const router = express.Router();
 

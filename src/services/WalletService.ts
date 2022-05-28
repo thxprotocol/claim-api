@@ -6,7 +6,9 @@ export default class WalletService {
     }
 
     static findByWallet(address: string) {
-        return Wallet.findOne({ _id: address });
+        return Wallet.findOne({
+            _id: address,
+        });
     }
 
     static async addWallet(address: string) {
@@ -15,7 +17,34 @@ export default class WalletService {
         });
     }
 
-    static isWalletExisting(address: string) {
-        return Wallet.exists({ _id: address });
+    static async removeWallet(address: string) {
+        await Wallet.deleteOne({
+            _id: address,
+        });
+    }
+
+    static async updateLastActiveAt(address: string) {
+        await Wallet.updateOne(
+            {
+                _id: address,
+            },
+            {
+                $set: {
+                    lastActiveAt: Date.now(),
+                },
+            },
+        );
+    }
+
+    static async getWalletsBeforeDate(date: Date) {
+        return await Wallet.find({
+            signedUpAt: {
+                $lt: date,
+            },
+        });
+    }
+
+    static async isWalletExisting(address: string) {
+        return await Wallet.exists({ _id: address });
     }
 }

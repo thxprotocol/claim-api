@@ -1,11 +1,12 @@
 import db from './database';
 import { Agenda } from 'agenda';
 import { logger } from './logger';
-import { jobProcessTransactions } from '@/jobs/requireTransactions';
-import {measureBalances} from "@/jobs/fetchBalance";
+import { measureBalances } from '@/jobs/fetchBalance';
+import { jobCalculateRewards } from '@/jobs/calculateRewards';
 
 export const eventNameRequireTransactions = 'requireTransactions';
-export const eventNameFetchBalance = 'FetchBalance';
+export const eventNameFetchBalance = 'fetchBalances';
+export const eventNameCalculateRewards = 'jobCalculateRewards';
 
 export const agenda = new Agenda({
     maxConcurrency: 1,
@@ -13,17 +14,19 @@ export const agenda = new Agenda({
     processEvery: '1 second',
 });
 
-agenda.define(eventNameRequireTransactions, jobProcessTransactions);
 agenda.define(eventNameFetchBalance, measureBalances);
+agenda.define(eventNameCalculateRewards, jobCalculateRewards);
 
 db.connection.once('open', async () => {
     agenda.mongo(db.connection.getClient().db(), 'jobs');
     await agenda.start();
 
-    await agenda.every('5 seconds', eventNameRequireTransactions);
+    // Runs every 8 hours starting at 00:00, skips the initialization measurement.
+    await agenda.every('0 */8 * * *', eventNameFetchBalance, {
+        skipImmediate: true,
+    });
 
-    // Runs every 8 hours starting at 00:00, skips the initialisation measurement.
-    await agenda.every('0 0 0/8 ? * * *', eventNameFetchBalance,{skipImmediate: true});
+    await agenda.every('0 1 * * 0', eventNameCalculateRewards);
 
     logger.info('Started agenda processing');
 });
