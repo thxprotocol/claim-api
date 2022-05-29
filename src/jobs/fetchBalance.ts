@@ -2,6 +2,7 @@ import axios from 'axios';
 import { COV_PRIVATE_KEY } from '@/config/secrets';
 import WalletService from '@/services/WalletService';
 import MeasurementService from '@/services/MeasurementService';
+import TokenService from '@/services/TokenService';
 
 export async function measureBalances() {
     const POLYGON_CHAIN_ID = 137;
@@ -12,12 +13,16 @@ export async function measureBalances() {
     // Get all wallets
     const wallets = await WalletService.getAllWallets();
 
-    // Retrieve the balances for all wallets available
+    // Get all tokens
+    const validTokens = await TokenService.getAllTokens().then((res) => {
+        return res.map((token) => token.type);
+    });
+
     for (const { _id } of wallets) {
         let tokens: { [k: string]: number } = {};
 
-        // Polygon Chain for Custom tokens like DOIS
-        const balance: { [k: string]: any } = await fetchBalance(POLYGON_CHAIN_ID, _id);
+        // Retrieve the balances for all wallets available
+        const balance: { [k: string]: any } = await fetchBalance(POLYGON_CHAIN_ID, _id, validTokens);
         tokens = procesResponse(balance, tokens);
 
         // If the wallet doesn't hold any of our token, ignore.
@@ -27,10 +32,7 @@ export async function measureBalances() {
     }
 }
 
-async function fetchBalance(chainId: number, address: string) {
-    // TODO Utilise DB once !52 has been merged.
-    const validTokens = ['THX', '$DOIS'];
-
+async function fetchBalance(chainId: number, address: string, validTokens: string[]) {
     const bal = await axios.get(
         `https://api.covalenthq.com/v1/${chainId}/address/${address}/balances_v2/?key=${COV_PRIVATE_KEY}`,
     );
