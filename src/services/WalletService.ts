@@ -37,4 +37,16 @@ export default class WalletService {
             },
         );
     }
+
+    static async getWalletsBeforeDate(date: Date) {
+        return await Wallet.find({
+            signedUpAt: {
+                $lt: date,
+            },
+        });
+    }
+
+    static async isWalletExisting(address: string) {
+        return await Wallet.exists({ _id: address });
+    }
 }
