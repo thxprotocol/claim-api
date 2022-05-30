@@ -3,16 +3,17 @@ import app from '@/app';
 
 const user = request.agent(app);
 const fakeWallet = "0x0000000000000000000000000000000000000000"
-const realWallet = "0x861efc0989df42d793e3147214fffca4d124cae8"
+const realWallet = "0xcb002B1561e1AEd22C3335b2687515229462c4CF"
 
 describe('Claims', () => {
     describe('POST /claims/:wallet', () => {
-        it('Successful adding wallet messages', () => {
-            user.post('/v1/claims/wallet/')
+        it('Successful adding wallet messages', async () => {
+            await user
+                .post('/v1/claims/wallet')
                 .send({ wallet: realWallet })
                 .expect((res: request.Response) => {
-                    expect(res.body.message).toBe('Wallet has been added!' || 'Wallet already exists!');
-                })
+                    expect(res.body.message).not.toBe('Provided address is invalid!');
+                });
         });
     });
 

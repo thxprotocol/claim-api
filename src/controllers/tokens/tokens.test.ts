@@ -10,17 +10,15 @@ const token = {
 
 describe('Tokens', () => {
     describe('POST /tokens/add', () => {
-        it('Successful adding token messages', () => {
-            user.post('/v1/tokens/add/')
+        it('Successful adding token messages',  () => {
+             user.post('/v1/tokens/add/')
                 .send({
                     address: token.address,
                     type: token.type,
-                    key: INSERT_WALLET_KEY
+                    key: INSERT_WALLET_KEY,
                 })
                 .expect((res: request.Response) => {
-                    console.log(res.body);
-                    expect(res.body.message).
-                    toBe('Token added to the database' || 'This address is already in the database');
+                    expect(res.body.message).toBe('Token added to the database' || 'This address is already in the database');
                 })
         });
     });

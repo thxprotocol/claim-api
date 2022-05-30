@@ -16,7 +16,7 @@ test('Should detect inactive when nothing got changed', () => {
     ]);
 
     const result = hasRetrievedRewards(database, contract);
-    expect(result).toBe(false);
+    expect(result).toBe(true);
 });
 
 test('Should detect inactive when nothing got changed, in a different order', () => {
@@ -33,7 +33,7 @@ test('Should detect inactive when nothing got changed, in a different order', ()
     ]);
 
     const result = hasRetrievedRewards(database, contract);
-    expect(result).toBe(false);
+    expect(result).toBe(true);
 });
 
 test('Should detect active when one reward got retrieved', () => {
