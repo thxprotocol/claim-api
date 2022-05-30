@@ -1,6 +1,5 @@
 import { calculation, hasRetrievedRewards, median } from './calculateRewards';
 import BigNumber from 'bignumber.js';
-import { toWei } from 'web3-utils';
 
 test('Should detect inactive when nothing got changed', () => {
     const database = new Map<string, BigNumber>([

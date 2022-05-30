@@ -47,7 +47,7 @@ docker compose down
 
 ## 3. Usage
 
-The thx_mainnet and thx_testnet containers will start with prefilled wallets and all required contracts will be deployed automatically.
+The thx_mainnet and thx_testnet containers will start with pre-filled wallets and all required contracts will be deployed automatically.
 
 ## 4. Testing
 
