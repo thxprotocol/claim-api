@@ -6,15 +6,17 @@ export default class WalletService {
     }
 
     static findByWallet(address: string) {
-        return Wallet.findOne({
-            _id: address,
-        });
+        return Wallet.findOne({ _id: address });
     }
 
     static async addWallet(address: string) {
         return await Wallet.create({
             _id: address,
         });
+    }
+
+    static isWalletExisting(address: string) {
+        return Wallet.exists({ _id: address });
     }
 
     static async removeWallet(address: string) {

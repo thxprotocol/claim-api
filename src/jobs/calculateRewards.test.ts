@@ -1,5 +1,6 @@
-import { hasRetrievedRewards } from './calculateRewards';
+import { calculation, hasRetrievedRewards, median } from './calculateRewards';
 import BigNumber from 'bignumber.js';
+import { toWei } from 'web3-utils';
 
 test('Should detect inactive when nothing got changed', () => {
     const database = new Map<string, BigNumber>([
@@ -62,4 +63,20 @@ test('Should detect active when all rewards got retrieved', () => {
 
     const result = hasRetrievedRewards(database, contract);
     expect(result).toBe(true);
+});
+
+test('Should calculate the share correctly per day', () => {
+    const values = [100, 100, 1000];
+    const totalMedianValues = 6100;
+
+    const result = calculation(values, totalMedianValues, new BigNumber(1));
+    expect(result.toNumber()).toBeCloseTo(0.016393443);
+});
+
+test('Should calculate the full distribution amount to the only account with values', () => {
+    const values = [6000, 9000, 1000];
+    const totalMedianValues = median(values);
+
+    const result = calculation(values, totalMedianValues, new BigNumber(1));
+    expect(result.toNumber()).toBe(1);
 });
