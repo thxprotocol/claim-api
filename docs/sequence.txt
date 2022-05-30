@@ -1,0 +1,33 @@
+title Staking pilot process
+
+participant User
+participant Wallet
+participant Smart Contract
+participant API
+participant Database
+
+==Sign up==
+User->API: Sign up to participate in pilot
+API->Database: Add user to database
+
+==Every 8 hours==
+API->Database: Request signed up users
+Database->API: Return users
+API->Wallet: Request wallet balance of every signed up user
+Wallet->API: Return wallet balances
+API->Database: Save wallet measurement
+
+==Every 7 days==
+API->Database: Request signed up users
+Database->API: Return users
+API->Database: Request all measurements of the last 7 days
+Database->API: Return all measurements
+API->Smart Contract: Request remaining rewards
+Smart Contract->API: Return rewards
+box over API:Check if users are inactive and calculate new rewards
+API->Database: Remove users who have been inactive for 3 months
+API->Smart Contract: Set new rewards per wallet
+
+==Collect==
+User->Smart Contract: Request transfer collected fees
+Smart Contract->Wallet: Transfer cut of collected fees

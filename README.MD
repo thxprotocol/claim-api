@@ -1,8 +1,13 @@
 [![CI](https://github.com/thxprotocol/api/actions/workflows/ci.yml/badge.svg)](https://github.com/thxprotocol/api/actions/workflows/ci.yml)
 
-# THX API
+# THX Claim API
 
-This repository holds the code for the THX API project. A REST API that can be used to interact the the THX Smart Contract layer and which main purpose is to make it easier for developers to utilize blockchain technology in their applications.
+This repository holds the code for the THX Claim API project. A REST API that can be used to interact the the THX Smart Contract layer and which main purpose is to make it easier for developers to utilize blockchain technology in their applications.
+
+This API is meant to distribute the collected fees of different tokens among token holders. Every 8 hours balances of signed up users are fetched and saved into a database, 3 measurements of a day are used to calculate the median wallet balances and used to calculate the user's cut of the collected fees.
+
+## Diagram
+![Sequence Diagram](./docs/sequence.png)
 
 ## Index
 
@@ -10,9 +15,8 @@ This repository holds the code for the THX API project. A REST API that can be u
 2. Installing
 3. Usage
 4. Testing
-5. Register clients
-6. Interface
-7. Database Schema Migration
+5. Interface
+6. Database Schema Migration
 
 ## 1. Prerequisites
 
@@ -56,38 +60,7 @@ The thx_mainnet and thx_testnet containers will start with pre-filled wallets an
 npm run test
 ```
 
-## 5. Register clients
-
-### 5.1 client_credentials example
-
-```
-POST http://localhost:3000/reg
-{
-    "application_type": "web",
-    "client_name": "Your App",
-    "grant_types": ["client_credentials"],
-    "redirect_uris": [],
-    "response_types": [],
-    "scope": "openid admin"
-}
-```
-
-### 5.2 authorization_code example
-
-```
-POST http://localhost:3000/reg
-{
-    "application_type": "web",
-    "client_name": "THX Wallet",
-    "grant_types": ["authorization_code"],
-    "redirect_uris": ["https://dev.wallet.thx.network/signin-oidc"],
-    "post_logout_redirect_uris": ["https://dev.wallet.thx.network"],
-    "response_types": ["code"],
-    "scope": "openid user email offline_access"
-}
-```
-
-## 6. Interface
+## 5. Interface
 
 Swagger Documentation is provided in the controllers of the routes and lives at the following endpoints:
 
@@ -97,9 +70,9 @@ Swagger Documentation is provided in the controllers of the routes and lives at 
 -   [Production API Specs](https://api.thx.network/v1/docs/)
 -   [Developer Documentation](http://docs.thx.network)
 
-## 7. Database Schema Migration
+## 6. Database Schema Migration
 
-### 7.1 To add a new migration script, use the following CLI command
+### 6.1 To add a new migration script, use the following CLI command
 
 ```
 npm run migrate:create name-of-my-script
@@ -112,7 +85,7 @@ A new file will be created inside migrations folder with a corresponding timesta
    |- 20210108114324-name-of-my-script.js
 ```
 
-### 7.2 To add a new property to the existing collection
+### 6.2 To add a new property to the existing collection
 
 Considering we want to add a quantity property to the products collection, the migration could be as follows:
 
@@ -128,7 +101,7 @@ export = {
 };
 ```
 
-### 7.3 Running migrations
+### 6.3 Running migrations
 
 To get the migration status
 
